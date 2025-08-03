@@ -4,13 +4,13 @@ A real-time collaborative presentation tool that allows multiple users to create
 
 ## Features
 
-- 🎨 Create and edit presentations with multiple slides
-- 👥 Real-time collaboration with multiple users
-- 🖌️ Rich text editing and formatting
-- 🖼️ Add images and shapes to slides
-- 🎭 Presentation mode for showcasing
-- 💾 Auto-save functionality
-- 🔄 Real-time cursor and selection tracking
+- Create and edit presentations with multiple slides
+- Real-time collaboration with multiple users
+- Rich text editing and formatting
+- Add images and shapes to slides
+- Presentation mode for showcasing
+- Auto-save functionality
+- Real-time cursor and selection tracking
 
 ## Tech Stack
 
