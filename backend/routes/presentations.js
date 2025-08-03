@@ -37,6 +37,28 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+router.put('/:id', async (req, res) => {
+  try {
+    const { title, updated_at } = req.body;
+    
+    // Validate required fields
+    if (!title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+    
+    const presentation = await Presentation.getById(req.params.id);
+    if (!presentation) {
+      return res.status(404).json({ error: 'Presentation not found' });
+    }
+    
+    await Presentation.update(req.params.id, title, updated_at);
+    res.json({ success: true, message: 'Presentation updated successfully' });
+  } catch (error) {
+    console.error('Error updating presentation:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
 router.delete('/:id', async (req, res) => {
   try {
     await Presentation.delete(req.params.id);

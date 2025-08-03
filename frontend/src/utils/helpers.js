@@ -26,26 +26,90 @@ export const exportToPDF = async (slides, presentationTitle = 'Presentation') =>
       format: 'a4'
     });
 
-    for (let i = 0; i < slides.length; i++) {
-      const slideElement = document.querySelector(`[data-slide-id="${slides[i].id}"]`);
-      if (slideElement) {
-        const canvas = await html2canvas(slideElement, {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: '#ffffff'
-        });
+    // Helper to render a slide DOM for export
+    const renderSlideForExport = (slide) => {
+      // Create a container div
+      const container = document.createElement('div');
+      container.style.position = 'fixed';
+      container.style.left = '-9999px';
+      container.style.top = '0';
+      container.style.width = '800px';
+      container.style.height = '450px';
+      container.style.background = '#fff';
+      container.setAttribute('data-slide-id', slide.id);
+      container.className = 'slide-canvas bg-white';
 
-        const imgData = canvas.toDataURL('image/png');
-        
-        if (i > 0) {
-          pdf.addPage();
+      // Render elements (basic, for PDF preview)
+      (slide.elements || []).forEach(element => {
+        const el = document.createElement('div');
+        el.style.position = 'absolute';
+        el.style.left = `${element.x}px`;
+        el.style.top = `${element.y}px`;
+        el.style.width = `${element.width}px`;
+        el.style.height = `${element.height}px`;
+        el.style.zIndex = element.zIndex || 1;
+        if (element.type === 'text') {
+          el.style.fontSize = (element.styles?.fontSize || '16px');
+          el.style.color = (element.styles?.color || '#000');
+          el.style.fontWeight = element.styles?.fontWeight || 'normal';
+          el.style.fontFamily = element.styles?.fontFamily || 'sans-serif';
+          el.style.display = 'flex';
+          el.style.alignItems = 'center';
+          el.style.justifyContent = 'center';
+          el.innerText = element.content?.text || '';
+        } else if (element.type === 'shape') {
+          el.style.background = element.styles?.fill || '#3b82f6';
+          el.style.border = `2px solid ${element.styles?.stroke || '#2563eb'}`;
+          el.style.borderRadius = element.content?.shape === 'circle' ? '50%' : '0';
+        } else if (element.type === 'image' && element.content?.src) {
+          const img = document.createElement('img');
+          img.src = element.content.src;
+          img.alt = element.content.alt || '';
+          img.style.width = '100%';
+          img.style.height = '100%';
+          img.style.objectFit = 'cover';
+          el.appendChild(img);
         }
-        
-        pdf.addImage(imgData, 'PNG', 10, 10, 277, 156);
+        container.appendChild(el);
+      });
+      document.body.appendChild(container);
+      return container;
+    };
+
+    // Render, capture, and remove each slide
+    for (let i = 0; i < slides.length; i++) {
+      // Try to find in DOM first (if visible)
+      let slideElement = document.querySelector(`[data-slide-id="${slides[i].id}"]`);
+      let tempRendered = false;
+      if (!slideElement) {
+        slideElement = renderSlideForExport(slides[i]);
+        tempRendered = true;
+      }
+
+      // Wait for images to load if present
+      if (slideElement && slideElement.querySelectorAll('img').length > 0) {
+        await Promise.all(Array.from(slideElement.querySelectorAll('img')).map(img => {
+          if (img.complete) return Promise.resolve();
+          return new Promise(res => { img.onload = img.onerror = res; });
+        }));
+      }
+
+      const canvas = await html2canvas(slideElement, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff'
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      if (i > 0) pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 10, 10, 277, 156);
+
+      if (tempRendered) {
+        document.body.removeChild(slideElement);
       }
     }
 
-    pdf.save(`${presentationTitle}.pdf`);
+    pdf.save(`${presentationTitle || 'Presentation'}.pdf`);
   } catch (error) {
     console.error('Failed to export PDF:', error);
     throw new Error('Failed to export presentation to PDF');

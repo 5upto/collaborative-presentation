@@ -31,6 +31,23 @@ class Presentation {
     return rows[0];
   }
 
+  static async update(id, title, updatedAt) {
+    const query = 'UPDATE presentations SET title = ?, updated_at = ? WHERE id = ?';
+    // Convert ISO string to MySQL datetime format
+    const timestamp = updatedAt ? new Date(updatedAt).toISOString().slice(0, 19).replace('T', ' ') : new Date().toISOString().slice(0, 19).replace('T', ' ');
+    
+    try {
+      const [result] = await db.execute(query, [title, timestamp, id]);
+      if (result.affectedRows === 0) {
+        throw new Error('No presentation found with the given ID');
+      }
+      return result;
+    } catch (error) {
+      console.error('Database error in Presentation.update:', error);
+      throw error;
+    }
+  }
+
   static async updateLastActivity(id) {
     const query = 'UPDATE presentations SET updated_at = NOW() WHERE id = ?';
     await db.execute(query, [id]);

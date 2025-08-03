@@ -178,7 +178,7 @@ const PresentMode = () => {
             }}
           >
             <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
-              {renderSVGShape(element.content.shapeType, shapeStyles)}
+              {renderSVGShape(element.content.shape, shapeStyles)}
             </svg>
           </div>
         );
@@ -221,11 +221,13 @@ const PresentMode = () => {
       strokeWidth: styles.strokeWidth || 2
     };
 
+    // For circle, we need to ensure it's rendered as a perfect circle
     switch (shapeType) {
       case 'rectangle':
         return <rect x={0} y={0} width="100%" height="100%" {...commonProps} />;
       case 'circle':
-        return <ellipse cx="50%" cy="50%" rx="50%" ry="50%" {...commonProps} />;
+        // Use viewBox units and radius of 50 to ensure perfect circle
+        return <circle cx="50" cy="50" r="45" {...commonProps} />;
       case 'triangle':
         return <polygon points="50,0 100,100 0,100" {...commonProps} />;
       default:
@@ -272,8 +274,15 @@ const PresentMode = () => {
                   onClick={() => goToSlide(index)}
                 >
                   <div className="aspect-video bg-white relative">
-                    <div className="absolute inset-0 scale-50 origin-top-left">
-                      {slide.elements?.map(renderSlideElement)}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="relative" style={{
+                        width: '100%',
+                        height: '100%',
+                        transform: 'scale(0.5)',
+                        transformOrigin: 'center'
+                      }}>
+                        {slide.elements?.map(renderSlideElement)}
+                      </div>
                     </div>
                   </div>
                   <div className="text-center py-2 text-sm">
@@ -286,10 +295,24 @@ const PresentMode = () => {
         </div>
       )}
 
-      {/* Main slide */}
-      <div className="w-full h-full flex items-center justify-center relative">
+      {/* Main slide - rendered exactly as created */}
+      <div className="w-full h-full flex items-center justify-center bg-white overflow-hidden">
         {currentSlide ? (
-          <div className="w-full h-full max-w-screen max-h-screen relative bg-white text-black">
+          <div 
+            className="relative"
+            style={{
+              width: '1920px',
+              height: '1080px',
+              transform: 'scale(1.4)',
+              transformOrigin: 'center',
+              position: 'absolute',
+              top: '90%',
+              left: '90%',
+              marginLeft: '-800px',
+              marginTop: '-400px',
+              backgroundColor: 'white'
+            }}
+          >
             {currentSlide.elements
               ?.sort((a, b) => (a.z_index || 0) - (b.z_index || 0))
               .map(renderSlideElement)}

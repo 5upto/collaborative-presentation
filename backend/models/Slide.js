@@ -48,6 +48,11 @@ class Slide {
     await db.execute(query, [id]);
   }
 
+  static async update(id, updates = {}) {
+    const query = 'UPDATE slides SET updated_at = NOW() WHERE id = ?';
+    await db.execute(query, [id]);
+  }
+
   static async updateOrder(id, order) {
     const query = 'UPDATE slides SET slide_order = ?, updated_at = NOW() WHERE id = ?';
     await db.execute(query, [order, id]);

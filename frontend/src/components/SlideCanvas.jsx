@@ -5,16 +5,7 @@ import ShapeElement from './ShapeElement';
 import ImageElement from './ImageElement';
 
 const SlideCanvas = () => {
-  const {
-    currentSlide,
-    selectedElements,
-    setSelectedElements,
-    canEdit,
-    zoom = 1,
-    socket,
-    presentation,
-    currentSlideIndex
-  } = usePresentation();
+  const { state, dispatch, socket, user } = usePresentation();
 
   const canvasRef = useRef(null);
   const [dragStartPos, setDragStartPos] = useState(null);
@@ -24,67 +15,80 @@ const SlideCanvas = () => {
   const SLIDE_WIDTH = 800;
   const SLIDE_HEIGHT = 450;
 
-  // Ensure zoom is always a valid number
-  const safeZoom = typeof zoom === 'number' && !isNaN(zoom) && zoom > 0 ? zoom : 1;
+  // Get current slide
+  const currentSlide = state.slides[state.currentSlideIndex];
+  const canEdit = ['creator', 'editor'].includes(state.userRole);
+  const safeZoom = typeof state.zoom === 'number' && !isNaN(state.zoom) && state.zoom > 0 ? state.zoom : 1;
+  const selectedTool = state.selectedTool || 'select';
 
   useEffect(() => {
     const handleClickOutside = () => {
       setContextMenu(null);
     };
-    
+
     const handleKeyDown = (e) => {
       if (!canEdit) return;
-      
+
       // Delete selected elements
-      if (e.key === 'Delete' && selectedElements.length > 0) {
-        selectedElements.forEach(elementId => {
+      if (e.key === 'Delete' && state.selectedElements.length > 0) {
+        state.selectedElements.forEach(elementId => {
+          dispatch({
+            type: 'DELETE_SLIDE_ELEMENT',
+            payload: { slideId: currentSlide?.id, elementId }
+          });
+
           socket?.emit('element-deleted', {
             elementId,
-            presentationId: presentation?.id
+            slideId: currentSlide?.id,
+            presentationId: state.presentation?.id
           });
         });
-        setSelectedElements([]);
-      }
-      
-      // Copy/Paste (simplified)
-      if (e.ctrlKey || e.metaKey) {
-        if (e.key === 'c' && selectedElements.length > 0) {
-          // Copy logic would go here
-        } else if (e.key === 'v') {
-          // Paste logic would go here
-        }
+        dispatch({ type: 'SET_SELECTED_ELEMENTS', payload: [] });
       }
     };
 
     document.addEventListener('click', handleClickOutside);
     document.addEventListener('keydown', handleKeyDown);
-    
+
     return () => {
       document.removeEventListener('click', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [canEdit, selectedElements, socket, presentation]);
+  }, [canEdit, state.selectedElements, socket, state.presentation, currentSlide, dispatch]);
 
   const handleCanvasMouseDown = useCallback((e) => {
     if (e.target !== canvasRef.current) return;
     if (!canEdit) return;
-    
+
     const rect = canvasRef.current.getBoundingClientRect();
     const x = (e.clientX - rect.left) / safeZoom;
     const y = (e.clientY - rect.top) / safeZoom;
-    
+
+    // Handle different tools
+    if (selectedTool === 'text') {
+      addElement('text', { x, y });
+      return;
+    } else if (selectedTool === 'rectangle') {
+      addElement('shape', { x, y, content: { shape: 'rectangle' } });
+      return;
+    } else if (selectedTool === 'circle') {
+      addElement('shape', { x, y, content: { shape: 'circle' } });
+      return;
+    }
+
+    // Default selection behavior
     setDragStartPos({ x, y });
     setSelectionBox({ startX: x, startY: y, endX: x, endY: y });
-    setSelectedElements([]);
-  }, [canEdit, safeZoom, setSelectedElements]);
+    dispatch({ type: 'SET_SELECTED_ELEMENTS', payload: [] });
+  }, [canEdit, safeZoom, dispatch, selectedTool]);
 
   const handleCanvasMouseMove = useCallback((e) => {
     if (!dragStartPos || !canEdit) return;
-    
+
     const rect = canvasRef.current.getBoundingClientRect();
     const x = (e.clientX - rect.left) / safeZoom;
     const y = (e.clientY - rect.top) / safeZoom;
-    
+
     setSelectionBox(prev => ({
       ...prev,
       endX: x,
@@ -94,37 +98,37 @@ const SlideCanvas = () => {
 
   const handleCanvasMouseUp = useCallback(() => {
     if (!dragStartPos || !selectionBox) return;
-    
+
     // Find elements within selection box
     const minX = Math.min(selectionBox.startX, selectionBox.endX);
     const maxX = Math.max(selectionBox.startX, selectionBox.endX);
     const minY = Math.min(selectionBox.startY, selectionBox.endY);
     const maxY = Math.max(selectionBox.startY, selectionBox.endY);
-    
+
     if (currentSlide?.elements) {
       const selectedIds = currentSlide.elements
         .filter(element => {
           const elemRight = element.x + element.width;
           const elemBottom = element.y + element.height;
-          
+
           return element.x < maxX && elemRight > minX &&
                  element.y < maxY && elemBottom > minY;
         })
         .map(element => element.id);
-      
-      setSelectedElements(selectedIds);
+
+      dispatch({ type: 'SET_SELECTED_ELEMENTS', payload: selectedIds });
     }
-    
+
     setDragStartPos(null);
     setSelectionBox(null);
-  }, [dragStartPos, selectionBox, currentSlide, setSelectedElements]);
+  }, [dragStartPos, selectionBox, currentSlide, dispatch]);
 
   const handleContextMenu = useCallback((e) => {
     if (!canEdit) return;
-    
+
     e.preventDefault();
     const rect = canvasRef.current.getBoundingClientRect();
-    
+
     setContextMenu({
       x: e.clientX,
       y: e.clientY,
@@ -135,57 +139,72 @@ const SlideCanvas = () => {
 
   const addElement = useCallback((type, options = {}) => {
     if (!canEdit || !currentSlide || !socket) return;
-    
+
     const element = {
+      id: `element_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       type,
       x: contextMenu?.canvasX || 100,
       y: contextMenu?.canvasY || 100,
       width: 200,
       height: 50,
-      zIndex: Date.now(),
+      zIndex: Math.floor(Math.random() * 1000) + 1,
       ...options
     };
-    
+
     if (type === 'text') {
       element.content = { text: 'Double-click to edit' };
       element.styles = { fontSize: '16px', color: '#000000' };
     } else if (type === 'shape') {
-      element.content = { shape: 'rectangle' };
+      // Use the shape type from options.content.shape if provided, otherwise default to rectangle
+      let shapeType = options.content && options.content.shape ? options.content.shape : 'rectangle';
+      element.content = { shape: shapeType };
       element.styles = { fill: '#3b82f6', stroke: '#2563eb', strokeWidth: 2 };
+      if (shapeType === 'circle') {
+        element.width = 100;
+        element.height = 100;
+      }
     }
-    
+
+    // Add to local state first
+    dispatch({
+      type: 'ADD_SLIDE_ELEMENT',
+      payload: { slideId: currentSlide.id, element }
+    });
+
+    // Then emit to server
     socket.emit('element-created', {
       slideId: currentSlide.id,
       element,
-      presentationId: presentation?.id
+      presentationId: state.presentation?.id
     });
-    
+
     setContextMenu(null);
-  }, [canEdit, currentSlide, socket, presentation, contextMenu]);
+  }, [canEdit, currentSlide, socket, state.presentation, contextMenu, dispatch]);
+
+  const handleElementSelect = useCallback((elementId) => {
+    if (canEdit) {
+      dispatch({ type: 'SET_SELECTED_ELEMENTS', payload: [elementId] });
+    }
+  }, [canEdit, dispatch]);
 
   const renderElement = (element) => {
-    const isSelected = selectedElements.includes(element.id);
-    
+    const isSelected = state.selectedElements.includes(element.id);
+
     const commonProps = {
-      key: element.id,
       element,
       isSelected,
       canEdit,
-      onSelect: () => {
-        if (canEdit) {
-          setSelectedElements([element.id]);
-        }
-      },
+      onSelect: () => handleElementSelect(element.id),
       zoom: safeZoom
     };
 
     switch (element.type) {
       case 'text':
-        return <TextElement {...commonProps} />;
+        return <TextElement key={element.id} {...commonProps} />;
       case 'shape':
-        return <ShapeElement {...commonProps} />;
+        return <ShapeElement key={element.id} {...commonProps} />;
       case 'image':
-        return <ImageElement {...commonProps} />;
+        return <ImageElement key={element.id} {...commonProps} />;
       default:
         return null;
     }
@@ -198,14 +217,18 @@ const SlideCanvas = () => {
         style={{
           width: SLIDE_WIDTH * safeZoom,
           height: SLIDE_HEIGHT * safeZoom,
-          transform: `scale(${safeZoom})`,
-          transformOrigin: 'center center'
         }}
       >
         <div
           ref={canvasRef}
-          className="w-full h-full bg-white relative overflow-hidden"
-          style={{ width: SLIDE_WIDTH, height: SLIDE_HEIGHT }}
+          className="w-full h-full bg-white relative overflow-hidden shadow-lg"
+          data-slide-id={currentSlide?.id}
+          style={{ 
+            width: SLIDE_WIDTH, 
+            height: SLIDE_HEIGHT,
+            transform: `scale(${safeZoom})`,
+            transformOrigin: 'top left'
+          }}
           onMouseDown={handleCanvasMouseDown}
           onMouseMove={handleCanvasMouseMove}
           onMouseUp={handleCanvasMouseUp}
@@ -214,7 +237,7 @@ const SlideCanvas = () => {
         >
           {/* Slide Elements */}
           {currentSlide?.elements?.map(renderElement)}
-          
+
           {/* Selection Box */}
           {selectionBox && (
             <div
@@ -234,34 +257,34 @@ const SlideCanvas = () => {
       {/* Context Menu */}
       {contextMenu && (
         <div
-          className="context-menu"
+          className="fixed bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50"
           style={{
             left: contextMenu.x,
             top: contextMenu.y
           }}
         >
           <div
-            className="context-menu-item"
+            className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm"
             onClick={() => addElement('text')}
           >
             Add Text
           </div>
-          <div className="context-menu-separator" />
+          <div className="border-t border-gray-200 my-1" />
           <div
-            className="context-menu-item"
+            className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm"
             onClick={() => addElement('shape', { content: { shape: 'rectangle' } })}
           >
             Add Rectangle
           </div>
           <div
-            className="context-menu-item"
+            className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm"
             onClick={() => addElement('shape', { content: { shape: 'circle' } })}
           >
             Add Circle
           </div>
-          <div className="context-menu-separator" />
+          <div className="border-t border-gray-200 my-1" />
           <div
-            className="context-menu-item"
+            className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm"
             onClick={() => {
               const input = document.createElement('input');
               input.type = 'file';

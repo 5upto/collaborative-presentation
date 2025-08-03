@@ -1,28 +1,15 @@
-import React, { useState, useRef, useEffect } from 'react';
-import Draggable from 'react-draggable';
-import { ResizableBox } from 'react-resizable';
-import ReactMarkdown from 'react-markdown';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePresentation } from '../context/PresentationContext';
+import ResizeHandles from './ResizeHandles';
 
 const TextElement = ({ element, isSelected, canEdit, onSelect, zoom }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [text, setText] = useState(element.content?.text || '');
   const [isDragging, setIsDragging] = useState(false);
-  const textareaRef = useRef(null);
-  const elementRef = useRef(null);
-  
-  const { socket, presentation } = usePresentation();
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [elementPos, setElementPos] = useState({ x: element.x, y: element.y });
+  const textRef = useRef(null);
 
-  useEffect(() => {
-    setText(element.content?.text || '');
-  }, [element.content?.text]);
-
-  useEffect(() => {
-    if (isEditing && textareaRef.current) {
-      textareaRef.current.focus();
-      textareaRef.current.select();
-    }
-  }, [isEditing]);
+  const { socket, state } = usePresentation();
 
   const handleDoubleClick = () => {
     if (canEdit) {
@@ -30,70 +17,104 @@ const TextElement = ({ element, isSelected, canEdit, onSelect, zoom }) => {
     }
   };
 
-  const handleTextChange = (newText) => {
-    setText(newText);
-  };
+  const handleTextChange = (e) => {
+    const newText = e.target.textContent;
+    const updatedElement = {
+      ...element,
+      content: { ...element.content, text: newText }
+    };
 
-  const handleTextBlur = () => {
-    setIsEditing(false);
-    
-    if (text !== element.content?.text && socket) {
-      const updatedElement = {
-        ...element,
-        content: { ...element.content, text }
-      };
-      
+    if (socket) {
       socket.emit('element-updated', {
         elementId: element.id,
         element: updatedElement,
-        presentationId: presentation?.id
+        slideId: state.slides[state.currentSlideIndex]?.id,
+        presentationId: state.presentation?.id
       });
     }
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-      handleTextBlur();
-    } else if (e.key === 'Escape') {
-      setText(element.content?.text || '');
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
       setIsEditing(false);
+      textRef.current?.blur();
     }
   };
 
-  const handleDragStart = () => {
+  const handleMouseDown = (e) => {
+    if (!canEdit || isEditing) return;
+
+    e.stopPropagation();
+    onSelect();
+
     setIsDragging(true);
+    setDragStart({
+      x: e.clientX - elementPos.x * zoom,
+      y: e.clientY - elementPos.y * zoom
+    });
   };
 
-  const handleDragStop = (e, data) => {
+  const handleMouseMove = (e) => {
+    if (!isDragging || !canEdit) return;
+
+    const newX = (e.clientX - dragStart.x) / zoom;
+    const newY = (e.clientY - dragStart.y) / zoom;
+
+    setElementPos({ x: newX, y: newY });
+  };
+
+  const handleMouseUp = () => {
+    if (!isDragging) return;
+
     setIsDragging(false);
-    
-    if (canEdit && socket && (data.x !== element.x || data.y !== element.y)) {
+
+    if (elementPos.x !== element.x || elementPos.y !== element.y) {
       const updatedElement = {
         ...element,
-        x: data.x,
-        y: data.y
+        x: Math.max(0, elementPos.x),
+        y: Math.max(0, elementPos.y)
       };
-      
-      socket.emit('element-updated', {
-        elementId: element.id,
-        element: updatedElement,
-        presentationId: presentation?.id
-      });
+
+      if (socket) {
+        socket.emit('element-updated', {
+          elementId: element.id,
+          element: updatedElement,
+          slideId: state.slides[state.currentSlideIndex]?.id,
+          presentationId: state.presentation?.id
+        });
+      }
     }
   };
 
-  const handleResize = (e, { size }) => {
-    if (canEdit && socket) {
-      const updatedElement = {
-        ...element,
-        width: size.width,
-        height: size.height
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
       };
-      
+    }
+  }, [isDragging, dragStart, zoom]);
+
+  useEffect(() => {
+    setElementPos({ x: element.x, y: element.y });
+  }, [element.x, element.y]);
+
+  const handleResize = (newDimensions) => {
+    const updatedElement = {
+      ...element,
+      ...newDimensions
+    };
+
+    if (socket) {
       socket.emit('element-updated', {
         elementId: element.id,
         element: updatedElement,
-        presentationId: presentation?.id
+        slideId: state.slides[state.currentSlideIndex]?.id,
+        presentationId: state.presentation?.id
       });
     }
   };
@@ -105,185 +126,49 @@ const TextElement = ({ element, isSelected, canEdit, onSelect, zoom }) => {
     fontStyle: element.styles?.fontStyle || 'normal',
     textDecoration: element.styles?.textDecoration || 'none',
     textAlign: element.styles?.textAlign || 'left',
-    lineHeight: '1.4'
+    lineHeight: '1.4',
+    outline: 'none',
+    border: 'none',
+    background: 'transparent',
+    width: '100%',
+    height: '100%',
+    padding: '4px',
+    cursor: canEdit ? (isEditing ? 'text' : 'move') : 'default'
   };
 
-  const elementClasses = `
-    slide-element text-element
-    ${isSelected ? 'selected' : ''}
-    ${isEditing ? 'editing' : ''}
-    ${isDragging ? 'dragging' : ''}
-  `.trim();
-
-  const content = (
+  return (
     <div
-      ref={elementRef}
-      className={elementClasses}
+      className={`absolute ${isSelected ? 'ring-2 ring-blue-500' : ''} ${isDragging ? 'opacity-75' : ''}`}
       style={{
-        position: 'absolute',
-        left: element.x,
-        top: element.y,
+        left: elementPos.x,
+        top: elementPos.y,
         width: element.width,
         height: element.height,
         zIndex: element.zIndex || 1,
-        cursor: canEdit ? (isDragging ? 'grabbing' : 'grab') : 'default'
+        cursor: canEdit ? 'move' : 'default'
       }}
-      onClick={(e) => {
-        e.stopPropagation();
-        if (canEdit) onSelect();
-      }}
+      onMouseDown={handleMouseDown}
       onDoubleClick={handleDoubleClick}
     >
-      {isEditing ? (
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={(e) => handleTextChange(e.target.value)}
-          onBlur={handleTextBlur}
-          onKeyDown={handleKeyDown}
-          style={{
-            ...textStyle,
-            width: '100%',
-            height: '100%',
-            border: 'none',
-            outline: 'none',
-            background: 'rgba(255, 255, 255, 0.95)',
-            padding: '8px',
-            resize: 'none',
-            borderRadius: '4px'
-          }}
-          placeholder="Enter text..."
-        />
-      ) : (
-        <div
-          style={{
-            ...textStyle,
-            width: '100%',
-            height: '100%',
-            padding: '8px',
-            overflow: 'hidden',
-            wordWrap: 'break-word'
-          }}
-          className="markdown-content"
-        >
-          {element.content?.isMarkdown ? (
-            <ReactMarkdown>{text}</ReactMarkdown>
-          ) : (
-            <div
-              dangerouslySetInnerHTML={{
-                __html: text.replace(/\n/g, '<br/>')
-              }}
-            />
-          )}
-        </div>
-      )}
-
-      {/* Resize handles */}
-      {isSelected && canEdit && !isEditing && (
-        <>
-          <div className="resize-handle nw" />
-          <div className="resize-handle ne" />
-          <div className="resize-handle sw" />
-          <div className="resize-handle se" />
-          <div className="resize-handle n" />
-          <div className="resize-handle s" />
-          <div className="resize-handle e" />
-          <div className="resize-handle w" />
-        </>
-      )}
-    </div>
-  );
-
-  if (!canEdit) {
-    return content;
-  }
-
-  return (
-    <Draggable
-      position={{ x: element.x, y: element.y }}
-      onStart={handleDragStart}
-      onStop={handleDragStop}
-      disabled={isEditing}
-      scale={zoom}
-    >
-      <div>
-        <ResizableBox
-          width={element.width}
-          height={element.height}
-          onResize={handleResize}
-          minConstraints={[50, 20]}
-          maxConstraints={[800, 600]}
-          resizeHandles={isSelected && !isEditing ? ['se', 'sw', 'ne', 'nw', 'n', 's', 'e', 'w'] : []}
-          handle={(handleAxis, ref) => (
-            <div
-              ref={ref}
-              className={`resize-handle ${handleAxis}`}
-              style={{
-                display: isSelected && !isEditing ? 'block' : 'none'
-              }}
-            />
-          )}
-        >
-          <div
-            className={elementClasses}
-            style={{
-              width: '100%',
-              height: '100%',
-              cursor: canEdit ? (isDragging ? 'grabbing' : 'grab') : 'default'
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (canEdit) onSelect();
-            }}
-            onDoubleClick={handleDoubleClick}
-          >
-            {isEditing ? (
-              <textarea
-                ref={textareaRef}
-                value={text}
-                onChange={(e) => handleTextChange(e.target.value)}
-                onBlur={handleTextBlur}
-                onKeyDown={handleKeyDown}
-                style={{
-                  ...textStyle,
-                  width: '100%',
-                  height: '100%',
-                  border: 'none',
-                  outline: 'none',
-                  background: 'rgba(255, 255, 255, 0.95)',
-                  padding: '8px',
-                  resize: 'none',
-                  borderRadius: '4px'
-                }}
-                placeholder="Enter text..."
-              />
-            ) : (
-              <div
-                style={{
-                  ...textStyle,
-                  width: '100%',
-                  height: '100%',
-                  padding: '8px',
-                  overflow: 'hidden',
-                  wordWrap: 'break-word'
-                }}
-                className="markdown-content"
-              >
-                {element.content?.isMarkdown ? (
-                  <ReactMarkdown>{text}</ReactMarkdown>
-                ) : (
-                  <div
-                    dangerouslySetInnerHTML={{
-                      __html: text.replace(/\n/g, '<br/>')
-                    }}
-                  />
-                )}
-              </div>
-            )}
-          </div>
-        </ResizableBox>
+      <div
+        ref={textRef}
+        contentEditable={isEditing}
+        suppressContentEditableWarning={true}
+        style={textStyle}
+        onBlur={() => setIsEditing(false)}
+        onInput={handleTextChange}
+        onKeyDown={handleKeyDown}
+      >
+        {element.content?.text || 'Double-click to edit'}
       </div>
-    </Draggable>
+      <ResizeHandles
+        element={element}
+        onResize={handleResize}
+        isSelected={isSelected}
+        canEdit={canEdit}
+        zoom={zoom}
+      />
+    </div>
   );
 };
 

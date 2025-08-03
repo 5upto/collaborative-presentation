@@ -19,7 +19,7 @@ import { usePresentation } from '../context/PresentationContext';
 import { ELEMENT_TYPES, SHAPE_TYPES, COLORS } from '../utils/constants';
 
 const Toolbar = () => {
-  const { state, dispatch } = usePresentation();
+  const { state, dispatch, socket } = usePresentation();
   const [selectedTool, setSelectedTool] = useState('select');
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [currentColor, setCurrentColor] = useState('#000000');
@@ -41,14 +41,24 @@ const Toolbar = () => {
   const handleToolSelect = (toolId) => {
     setSelectedTool(toolId);
     dispatch({ type: 'SET_SELECTED_TOOL', payload: toolId });
+    
+    // Clear any selected elements when switching tools
+    dispatch({ type: 'SET_SELECTED_ELEMENTS', payload: [] });
+    
+    // Trigger image upload dialog when image tool is selected
+    if (toolId === 'image') {
+      triggerImageUpload();
+    }
   };
 
   const handleUndo = () => {
     dispatch({ type: 'UNDO' });
+    socket.emit('action-performed', { action: 'undo', slideId: state.slides[state.currentSlideIndex]?.id });
   };
-
+  
   const handleRedo = () => {
     dispatch({ type: 'REDO' });
+    socket.emit('action-performed', { action: 'redo', slideId: state.slides[state.currentSlideIndex]?.id });
   };
 
   const handleZoomIn = () => {
@@ -79,11 +89,131 @@ const Toolbar = () => {
     if (file) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        // Handle image upload logic
-        console.log('Image uploaded:', e.target.result);
+        const currentSlide = state.slides[state.currentSlideIndex];
+        if (currentSlide) {
+          const imageElement = {
+            id: `img_${Date.now()}`,
+            type: 'image',
+            x: 100,
+            y: 100,
+            width: 200,
+            height: 150,
+            zIndex: Math.floor(Math.random() * 1000) + 1,
+            content: {
+              src: e.target.result,
+              alt: file.name
+            },
+            styles: {}
+          };
+          
+          dispatch({
+            type: 'ADD_SLIDE_ELEMENT',
+            payload: {
+              slideId: currentSlide.id,
+              element: imageElement
+            }
+          });
+
+          // Emit to socket if available
+          if (socket) {
+            socket.emit('element-created', {
+              slideId: currentSlide.id,
+              element: imageElement,
+              presentationId: state.presentation?.id
+            });
+          }
+        }
       };
       reader.readAsDataURL(file);
     }
+    // Reset the input
+    event.target.value = '';
+  };
+
+  const handleColorChange = (color) => {
+    setCurrentColor(color);
+    setShowColorPicker(false);
+    
+    // Apply color to selected elements
+    if (state.selectedElements.length > 0) {
+      const currentSlide = state.slides[state.currentSlideIndex];
+      if (currentSlide) {
+        state.selectedElements.forEach(elementId => {
+          const element = currentSlide.elements?.find(el => el.id === elementId);
+          if (element) {
+            const styleUpdate = element.type === 'text' 
+              ? { color } 
+              : { fill: color };
+            
+            dispatch({
+              type: 'UPDATE_SLIDE_ELEMENT',
+              payload: {
+                slideId: currentSlide.id,
+                elementId,
+                updates: { styles: styleUpdate }
+              }
+            });
+
+            // Emit to socket if available
+            if (socket) {
+              socket.emit('element-updated', {
+                elementId,
+                element: { ...element, styles: { ...element.styles, ...styleUpdate } },
+                slideId: currentSlide.id,
+                presentationId: state.presentation?.id
+              });
+            }
+          }
+        });
+      }
+    }
+  };
+
+  const handleTextFormat = (formatType) => {
+    if (state.selectedElements.length > 0) {
+      const currentSlide = state.slides[state.currentSlideIndex];
+      if (currentSlide) {
+        state.selectedElements.forEach(elementId => {
+          const element = currentSlide.elements?.find(el => el.id === elementId);
+          if (element && element.type === 'text') {
+            const currentStyles = element.styles || {};
+            let styleUpdate = {};
+            
+            if (formatType === 'bold') {
+              styleUpdate.fontWeight = currentStyles.fontWeight === 'bold' ? 'normal' : 'bold';
+            } else if (formatType === 'italic') {
+              styleUpdate.fontStyle = currentStyles.fontStyle === 'italic' ? 'normal' : 'italic';
+            } else if (formatType === 'underline') {
+              const currentDecoration = currentStyles.textDecoration || 'none';
+              styleUpdate.textDecoration = currentDecoration.includes('underline') ? 'none' : 'underline';
+            }
+            
+            dispatch({
+              type: 'UPDATE_SLIDE_ELEMENT',
+              payload: {
+                slideId: currentSlide.id,
+                elementId,
+                updates: { styles: styleUpdate }
+              }
+            });
+
+            // Emit to socket if available
+            if (socket) {
+              socket.emit('element-updated', {
+                elementId,
+                element: { ...element, styles: { ...currentStyles, ...styleUpdate } },
+                slideId: currentSlide.id,
+                presentationId: state.presentation?.id
+              });
+            }
+          }
+        });
+      }
+    }
+  };
+
+  const triggerImageUpload = () => {
+    document.getElementById('image-upload').click();
   };
 
   return (
@@ -109,13 +239,28 @@ const Toolbar = () => {
           <div className="w-px h-6 bg-gray-300 mx-2" />
 
           {/* Text Formatting */}
-          <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+          <button 
+            onClick={() => handleTextFormat('bold')}
+            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            disabled={state.selectedElements.length === 0}
+            title="Bold"
+          >
             <Bold className="h-5 w-5" />
           </button>
-          <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+          <button 
+            onClick={() => handleTextFormat('italic')}
+            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            disabled={state.selectedElements.length === 0}
+            title="Italic"
+          >
             <Italic className="h-5 w-5" />
           </button>
-          <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+          <button 
+            onClick={() => handleTextFormat('underline')}
+            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            disabled={state.selectedElements.length === 0}
+            title="Underline"
+          >
             <Underline className="h-5 w-5" />
           </button>
 
@@ -131,20 +276,24 @@ const Toolbar = () => {
             </button>
             
             {showColorPicker && (
-              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-10">
-                <div className="grid grid-cols-5 gap-1">
+              <div className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl p-3 z-20 min-w-[220px]">
+                <div className="grid grid-cols-5 gap-2">
                   {colors.map((color) => (
                     <button
                       key={color}
-                      onClick={() => {
-                        setCurrentColor(color);
-                        setShowColorPicker(false);
-                      }}
-                      className={`w-8 h-8 rounded border-2 ${
-                        currentColor === color ? 'border-gray-400' : 'border-gray-200'
+                      onClick={() => handleColorChange(color)}
+                      className={`w-9 h-9 flex items-center justify-center rounded-full border-2 transition-all duration-150 shadow-sm hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+                        currentColor === color ? 'border-blue-500 ring-2 ring-blue-300' : 'border-gray-200'
                       }`}
                       style={{ backgroundColor: color }}
-                    />
+                      title={`Color: ${color}`}
+                    >
+                      {currentColor === color && (
+                        <svg className="w-5 h-5 text-white drop-shadow" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -156,14 +305,14 @@ const Toolbar = () => {
           {/* History Controls */}
           <button
             onClick={handleUndo}
-            disabled={!state.canUndo}
+            disabled={!(state.historyIndex > 0)}
             className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Undo className="h-5 w-5" />
           </button>
           <button
             onClick={handleRedo}
-            disabled={!state.canRedo}
+            disabled={!(state.historyIndex < state.history.length - 1)}
             className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Redo className="h-5 w-5" />

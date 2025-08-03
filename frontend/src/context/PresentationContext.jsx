@@ -9,6 +9,7 @@ const initialState = {
   currentSlideIndex: 0,
   users: [],
   selectedElements: [],
+  selectedTool: 'select',
   history: [],
   historyIndex: -1,
   isPresenting: false,
@@ -48,6 +49,7 @@ function presentationReducer(state, action) {
         history: [...state.history.slice(0, state.historyIndex + 1), {
           type: 'slide_added',
           data: action.payload,
+          slides: JSON.parse(JSON.stringify([...state.slides, action.payload])),
           timestamp: Date.now()
         }],
         historyIndex: state.historyIndex + 1
@@ -62,6 +64,7 @@ function presentationReducer(state, action) {
         history: [...state.history.slice(0, state.historyIndex + 1), {
           type: 'slide_deleted',
           data: action.payload,
+          slides: JSON.parse(JSON.stringify(newSlides)),
           timestamp: Date.now()
         }],
         historyIndex: state.historyIndex + 1
@@ -76,7 +79,12 @@ function presentationReducer(state, action) {
                 ...slide,
                 elements: slide.elements.map(element =>
                   element.id === action.payload.elementId
-                    ? { ...element, ...action.payload.updates }
+                    ? { 
+                        ...element, 
+                        ...action.payload.updates,
+                        styles: element.styles ? { ...element.styles, ...action.payload.updates.styles } : action.payload.updates.styles,
+                        content: element.content ? { ...element.content, ...action.payload.updates.content } : action.payload.updates.content
+                      }
                     : element
                 )
               }
@@ -98,6 +106,11 @@ function presentationReducer(state, action) {
         history: [...state.history.slice(0, state.historyIndex + 1), {
           type: 'element_added',
           data: action.payload,
+          slides: JSON.parse(JSON.stringify(state.slides.map(slide =>
+            slide.id === action.payload.slideId
+              ? { ...slide, elements: [...slide.elements, action.payload.element] }
+              : slide
+          ))),
           timestamp: Date.now()
         }],
         historyIndex: state.historyIndex + 1
@@ -118,6 +131,11 @@ function presentationReducer(state, action) {
         history: [...state.history.slice(0, state.historyIndex + 1), {
           type: 'element_deleted',
           data: action.payload,
+          slides: JSON.parse(JSON.stringify(state.slides.map(slide =>
+            slide.id === action.payload.slideId
+              ? { ...slide, elements: slide.elements.filter(element => element.id !== action.payload.elementId) }
+              : slide
+          ))),
           timestamp: Date.now()
         }],
         historyIndex: state.historyIndex + 1
@@ -132,15 +150,28 @@ function presentationReducer(state, action) {
     case 'SET_PRESENTING':
       return { ...state, isPresenting: action.payload };
     
+    case 'SET_SELECTED_TOOL':
+      return { ...state, selectedTool: action.payload };
+    
     case 'UNDO':
       if (state.historyIndex > 0) {
-        return { ...state, historyIndex: state.historyIndex - 1 };
+        const prevHistory = state.history[state.historyIndex - 1];
+        return {
+          ...state,
+          slides: prevHistory.slides || state.slides,
+          historyIndex: state.historyIndex - 1
+        };
       }
       return state;
-    
+
     case 'REDO':
       if (state.historyIndex < state.history.length - 1) {
-        return { ...state, historyIndex: state.historyIndex + 1 };
+        const nextHistory = state.history[state.historyIndex + 1];
+        return {
+          ...state,
+          slides: nextHistory.slides || state.slides,
+          historyIndex: state.historyIndex + 1
+        };
       }
       return state;
     
@@ -171,21 +202,27 @@ export const PresentationProvider = ({ children, user }) => {
       });
 
       socket.on('element-updated', (data) => {
-        dispatch({
-          type: 'UPDATE_SLIDE_ELEMENT',
-          payload: { 
-            slideId: data.slideId, 
-            elementId: data.elementId, 
-            updates: data.element 
-          }
-        });
+        const currentSlide = state.slides[state.currentSlideIndex];
+        if (currentSlide && currentSlide.id === data.slideId) {
+          dispatch({
+            type: 'UPDATE_SLIDE_ELEMENT',
+            payload: { 
+              slideId: data.slideId, 
+              elementId: data.elementId, 
+              updates: data.element 
+            }
+          });
+        }
       });
 
       socket.on('element-deleted', (data) => {
-        dispatch({
-          type: 'DELETE_SLIDE_ELEMENT',
-          payload: { slideId: data.slideId, elementId: data.elementId }
-        });
+        const currentSlide = state.slides[state.currentSlideIndex];
+        if (currentSlide && currentSlide.id === data.slideId) {
+          dispatch({
+            type: 'DELETE_SLIDE_ELEMENT',
+            payload: { slideId: data.slideId, elementId: data.elementId }
+          });
+        }
       });
 
       socket.on('slide-changed', (data) => {

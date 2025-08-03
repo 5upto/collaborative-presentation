@@ -34,7 +34,8 @@ module.exports = (io) => {
           element: { ...element, id: elementId }
         });
       } catch (error) {
-        socket.emit('error', { message: 'Failed to create element' });
+        console.error('Socket element creation error:', error);
+        socket.emit('error', { message: `Failed to create element: ${error.message}` });
       }
     });
 
@@ -47,7 +48,8 @@ module.exports = (io) => {
         
         socket.to(presentationId).emit('element-updated', {
           elementId,
-          element
+          element,
+          slideId: data.slideId
         });
       } catch (error) {
         socket.emit('error', { message: 'Failed to update element' });
@@ -61,7 +63,10 @@ module.exports = (io) => {
         await Element.delete(elementId);
         await Presentation.updateLastActivity(presentationId);
         
-        socket.to(presentationId).emit('element-deleted', { elementId });
+        socket.to(presentationId).emit('element-deleted', { 
+          elementId,
+          slideId: data.slideId 
+        });
       } catch (error) {
         socket.emit('error', { message: 'Failed to delete element' });
       }
@@ -96,6 +101,16 @@ module.exports = (io) => {
         console.error('Error handling disconnect:', error);
       }
       console.log('User disconnected:', socket.id);
+
+      socket.on('save-presentation', async (data) => {
+        try {
+          await Presentation.save(data.presentation);
+          
+          socket.to(data.presentationId).emit('presentation-saved', { slideId: data.currentSlideId });
+        } catch (error) {
+          socket.emit('error', { message: 'Failed to save presentation' });
+        }
+      });
     });
   });
 };

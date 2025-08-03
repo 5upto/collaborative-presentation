@@ -26,7 +26,7 @@ const PresentationEditor = () => {
   const loadPresentation = async () => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
-      
+
       const [presentationResponse, slidesResponse] = await Promise.all([
         api.get(`/presentations/${id}`),
         api.get(`/slides/presentation/${id}`)
@@ -51,19 +51,34 @@ const PresentationEditor = () => {
     }
   };
 
-  const handleSave = useCallback(async () => {
-    if (saving) return;
-    
+  const handleSave = async () => {
+    if (!state.presentation?.id) return;
+
+    setSaving(true);
     try {
-      setSaving(true);
-      // Auto-save logic would go here
+      // Save presentation metadata
+      await api.put(`/presentations/${state.presentation.id}`, {
+        title: state.presentation.title,
+        updated_at: new Date().toISOString()
+      });
+
+      // Save each slide with its elements
+      for (const slide of state.slides) {
+        await api.put(`/slides/${slide.id}`, {
+          title: slide.title || '',
+          elements: slide.elements || []
+        });
+      }
+
       setLastSaved(new Date());
+      alert('Presentation saved successfully!');
     } catch (error) {
-      console.error('Failed to save:', error);
+      console.error('Failed to save presentation:', error);
+      alert('Failed to save presentation. Please try again.');
     } finally {
       setSaving(false);
     }
-  }, [saving]);
+  };
 
   const handleExportPDF = async () => {
     try {
@@ -81,7 +96,7 @@ const PresentationEditor = () => {
   // Safely access state properties with defaults
   const isLoading = state?.isLoading || false;
   const error = state?.error || null;
-  
+
   // Show loading state
   if (isLoading) {
     return (
@@ -130,7 +145,7 @@ const PresentationEditor = () => {
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
-          
+
           <div>
             <h1 className="text-lg font-semibold text-gray-900">
               {state.presentation?.title || 'Untitled Presentation'}
@@ -154,7 +169,7 @@ const PresentationEditor = () => {
             <Save className="h-4 w-4" />
             <span>Save</span>
           </button>
-          
+
           <button
             onClick={handleExportPDF}
             className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
@@ -162,7 +177,7 @@ const PresentationEditor = () => {
             <Download className="h-4 w-4" />
             <span>Export PDF</span>
           </button>
-          
+
           <button
             onClick={handlePresentMode}
             className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"

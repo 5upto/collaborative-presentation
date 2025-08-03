@@ -22,6 +22,29 @@ router.post('/', async (req, res) => {
   }
 });
 
+router.put('/:id', async (req, res) => {
+  try {
+    const { elements } = req.body;
+
+    // Update slide timestamp
+    await Slide.update(req.params.id);
+
+    // Clear existing elements and save new ones
+    await Element.deleteBySlideId(req.params.id);
+
+    if (elements && elements.length > 0) {
+      for (const element of elements) {
+        await Element.create(req.params.id, element);
+      }
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating slide:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.delete('/:id', async (req, res) => {
   try {
     await Slide.delete(req.params.id);

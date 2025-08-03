@@ -13,7 +13,15 @@ const pool = mysql.createPool({
   ...dbConfig,
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+});
+
+// Configure MySQL session variables for each connection
+pool.on('connection', function (connection) {
+  connection.query('SET SESSION sort_buffer_size = 2097152');  // 2MB
+  connection.query('SET SESSION max_sort_length = 8192');      // 8KB  
+  connection.query('SET SESSION tmp_table_size = 67108864');   // 64MB
+  connection.query('SET SESSION max_heap_table_size = 67108864'); // 64MB
 });
 
 const initDatabase = async () => {
@@ -68,7 +76,7 @@ const createTables = async () => {
         width FLOAT DEFAULT 100,
         height FLOAT DEFAULT 50,
         styles JSON,
-        z_index INT DEFAULT 1,
+        z_index BIGINT DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (slide_id) REFERENCES slides(id) ON DELETE CASCADE
