@@ -49,16 +49,12 @@ A real-time collaborative presentation tool that allows multiple users to create
    ```bash
    cd backend
    npm install
-   cp .env.example .env
-   # Update .env with your database credentials
    ```
 
 3. Set up the frontend:
    ```bash
    cd ../frontend
    npm install
-   cp .env.example .env
-   # Update .env with your backend URL
    ```
 
 ### Running the Application
@@ -66,7 +62,7 @@ A real-time collaborative presentation tool that allows multiple users to create
 1. Start the backend server:
    ```bash
    cd backend
-   npm run dev
+   node server.js
    ```
 
 2. In a new terminal, start the frontend development server:
