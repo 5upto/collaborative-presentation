@@ -52,13 +52,39 @@ const Toolbar = () => {
   };
 
   const handleUndo = () => {
-    dispatch({ type: 'UNDO' });
-    socket.emit('action-performed', { action: 'undo', slideId: state.slides[state.currentSlideIndex]?.id });
+    if (state.historyIndex > 0) {
+      dispatch({ type: 'UNDO' });
+      
+      // Emit the state after undo to sync with other users
+      setTimeout(() => {
+        const currentSlide = state.slides[state.currentSlideIndex];
+        if (socket && currentSlide) {
+          socket.emit('slide-updated', {
+            slideId: currentSlide.id,
+            elements: currentSlide.elements,
+            presentationId: state.presentation?.id
+          });
+        }
+      }, 100);
+    }
   };
   
   const handleRedo = () => {
-    dispatch({ type: 'REDO' });
-    socket.emit('action-performed', { action: 'redo', slideId: state.slides[state.currentSlideIndex]?.id });
+    if (state.historyIndex < state.history.length - 1) {
+      dispatch({ type: 'REDO' });
+      
+      // Emit the state after redo to sync with other users
+      setTimeout(() => {
+        const currentSlide = state.slides[state.currentSlideIndex];
+        if (socket && currentSlide) {
+          socket.emit('slide-updated', {
+            slideId: currentSlide.id,
+            elements: currentSlide.elements,
+            presentationId: state.presentation?.id
+          });
+        }
+      }, 100);
+    }
   };
 
   const handleZoomIn = () => {

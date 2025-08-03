@@ -8,6 +8,7 @@ import UsersList from './UsersList';
 import { api } from '../utils/api';
 import { ArrowLeft, Play, Save, Download } from 'lucide-react';
 import { exportToPDF } from '../utils/helpers';
+import { toast } from 'react-toastify';
 
 const PresentationEditor = () => {
   const { id } = useParams();
@@ -19,9 +20,15 @@ const PresentationEditor = () => {
   useEffect(() => {
     if (id && socket) {
       loadPresentation();
-      joinPresentation();
     }
   }, [id, socket]);
+
+  // Join presentation after presentation data is loaded
+  useEffect(() => {
+    if (state.presentation && socket && id) {
+      joinPresentation();
+    }
+  }, [state.presentation, socket, id]);
 
   const loadPresentation = async () => {
     try {
@@ -41,8 +48,8 @@ const PresentationEditor = () => {
   };
 
   const joinPresentation = () => {
-    if (socket && id) {
-      const role = state.presentation?.creator_nickname === user.nickname ? 'creator' : 'viewer';
+    if (socket && id && state.presentation) {
+      const role = state.presentation.creator_nickname === user.nickname ? 'creator' : 'viewer';
       socket.emit('join-presentation', {
         presentationId: id,
         nickname: user.nickname,
@@ -62,19 +69,31 @@ const PresentationEditor = () => {
         updated_at: new Date().toISOString()
       });
 
-      // Save each slide with its elements
+      // Save each slide with its elements - ensure all properties are included
       for (const slide of state.slides) {
+        const elementsToSave = (slide.elements || []).map(element => ({
+          id: element.id,
+          type: element.type,
+          x: element.x || 0,
+          y: element.y || 0,
+          width: element.width || 100,
+          height: element.height || 50,
+          content: element.content || {},
+          styles: element.styles || {},
+          zIndex: element.zIndex || element.z_index || 1
+        }));
+
         await api.put(`/slides/${slide.id}`, {
           title: slide.title || '',
-          elements: slide.elements || []
+          elements: elementsToSave
         });
       }
 
       setLastSaved(new Date());
-      alert('Presentation saved successfully!');
+      toast.success('Presentation saved successfully!');
     } catch (error) {
       console.error('Failed to save presentation:', error);
-      alert('Failed to save presentation. Please try again.');
+      toast.error('Failed to save presentation. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -83,9 +102,10 @@ const PresentationEditor = () => {
   const handleExportPDF = async () => {
     try {
       await exportToPDF(state.slides, state.presentation?.title);
+      toast.success('Exported PDF successfully!');
     } catch (error) {
       console.error('Failed to export PDF:', error);
-      alert('Failed to export presentation to PDF');
+      toast.error('Failed to export presentation to PDF');
     }
   };
 

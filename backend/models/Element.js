@@ -23,24 +23,39 @@ class Element {
     }
   }
 
+  static async getById(id) {
+    const query = 'SELECT * FROM slide_elements WHERE id = ?';
+    const [rows] = await db.execute(query, [id]);
+    if (rows[0]) {
+      return {
+        ...rows[0],
+        content: JSON.parse(rows[0].content || '{}'),
+        styles: JSON.parse(rows[0].styles || '{}'),
+        zIndex: rows[0].z_index
+      };
+    }
+    return null;
+  }
+
   static async update(id, elementData) {
     const query = `
       UPDATE slide_elements 
-      SET content = ?, x = ?, y = ?, width = ?, height = ?, styles = ?, z_index = ?, updated_at = NOW()
+      SET type = ?, x = ?, y = ?, width = ?, height = ?, 
+          content = ?, styles = ?, z_index = ?
       WHERE id = ?
     `;
-    const { content, x, y, width, height, styles, zIndex } = elementData;
-    // Ensure zIndex is within valid range
-    const safeZIndex = Math.max(0, Math.min(zIndex || 1, 999999));
-    try {
-      await db.execute(query, [
-        JSON.stringify(content), x, y, width, height, 
-        JSON.stringify(styles || {}), safeZIndex, id
-      ]);
-    } catch (error) {
-      console.error('Element update error:', error);
-      throw new Error(`Failed to update element: ${error.message}`);
-    }
+
+    await db.execute(query, [
+      elementData.type,
+      Number(elementData.x) || 0,
+      Number(elementData.y) || 0,
+      Number(elementData.width) || 100,
+      Number(elementData.height) || 50,
+      JSON.stringify(elementData.content || {}),
+      JSON.stringify(elementData.styles || {}),
+      Number(elementData.zIndex) || 1,
+      id
+    ]);
   }
 
   static async delete(id) {
@@ -53,12 +68,6 @@ class Element {
     await db.execute(query, [slideId]);
   }
 
-  static async getById(id) {
-    const query = 'SELECT * FROM slide_elements WHERE id = ?';
-    const [rows] = await db.execute(query, [id]);
-    return rows[0];
-  }
-
   static async getBySlideId(slideId) {
     const [rows] = await db.execute(
       'SELECT * FROM slide_elements WHERE slide_id = ? ORDER BY z_index ASC LIMIT 1000',
@@ -67,7 +76,8 @@ class Element {
     return rows.map(row => ({
       ...row,
       content: JSON.parse(row.content),
-      styles: JSON.parse(row.styles || '{}')
+      styles: JSON.parse(row.styles || '{}'),
+      zIndex: row.z_index
     }));
   }
 }

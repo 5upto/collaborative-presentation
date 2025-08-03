@@ -34,7 +34,19 @@ router.put('/:id', async (req, res) => {
 
     if (elements && elements.length > 0) {
       for (const element of elements) {
-        await Element.create(req.params.id, element);
+        // Ensure all required properties are present
+        const elementData = {
+          type: element.type,
+          x: Number(element.x) || 0,
+          y: Number(element.y) || 0,
+          width: Number(element.width) || 100,
+          height: Number(element.height) || 50,
+          content: typeof element.content === 'object' ? element.content : {},
+          styles: typeof element.styles === 'object' ? element.styles : {},
+          zIndex: Number(element.zIndex || element.z_index) || 1
+        };
+
+        await Element.create(req.params.id, elementData);
       }
     }
 

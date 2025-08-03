@@ -39,7 +39,12 @@ class Slide {
     const [rows] = await db.execute(query, [presentationId]);
     return rows.map(row => ({
       ...row,
-      elements: row.elements[0] ? row.elements.filter(e => e !== null) : []
+      elements: row.elements[0] ? row.elements.filter(e => e !== null).map(element => ({
+        ...element,
+        content: typeof element.content === 'string' ? JSON.parse(element.content) : element.content,
+        styles: typeof element.styles === 'string' ? JSON.parse(element.styles) : element.styles,
+        zIndex: element.z_index || element.zIndex || 1
+      })) : []
     }));
   }
 

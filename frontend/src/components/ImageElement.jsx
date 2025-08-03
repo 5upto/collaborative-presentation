@@ -9,7 +9,7 @@ const ImageElement = ({ element, isSelected, canEdit, onSelect, zoom }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
-  const { socket, state } = usePresentation();
+  const { socket, state, dispatch } = usePresentation();
 
   const handleMouseDown = (e) => {
     if (!canEdit) return;
@@ -31,29 +31,68 @@ const ImageElement = ({ element, isSelected, canEdit, onSelect, zoom }) => {
     const newY = (e.clientY - dragStart.y) / zoom;
 
     setElementPos({ x: newX, y: newY });
+    
+    // Update position immediately during drag (no history)
+    if (window.imageDragTimeout) {
+      clearTimeout(window.imageDragTimeout);
+    }
+    
+    window.imageDragTimeout = setTimeout(() => {
+      const roundedX = Math.max(0, Math.round(newX));
+      const roundedY = Math.max(0, Math.round(newY));
+      
+      // Update context state without adding to history during drag
+      dispatch({
+        type: 'UPDATE_SLIDE_ELEMENT',
+        payload: {
+          slideId: state.slides[state.currentSlideIndex]?.id,
+          elementId: element.id,
+          updates: { x: roundedX, y: roundedY },
+          autoSave: false,
+          addToHistory: false // Don't add to history during drag
+        }
+      });
+
+      // Emit socket update
+      if (socket && state.slides[state.currentSlideIndex]?.id) {
+        socket.emit('element-updated', {
+          elementId: element.id,
+          element: {
+            ...element,
+            x: roundedX,
+            y: roundedY
+          },
+          slideId: state.slides[state.currentSlideIndex].id,
+          presentationId: state.presentation?.id
+        });
+      }
+    }, 100);
   };
 
   const handleMouseUp = () => {
     if (!isDragging) return;
 
     setIsDragging(false);
-
-    if (elementPos.x !== element.x || elementPos.y !== element.y) {
-      const updatedElement = {
-        ...element,
-        x: Math.max(0, elementPos.x),
-        y: Math.max(0, elementPos.y)
-      };
-
-      if (socket) {
-        socket.emit('element-updated', {
-          elementId: element.id,
-          element: updatedElement,
-          slideId: state.slides[state.currentSlideIndex]?.id,
-          presentationId: state.presentation?.id
-        });
-      }
+    
+    // Clear any pending drag timeout
+    if (window.imageDragTimeout) {
+      clearTimeout(window.imageDragTimeout);
     }
+    
+    // Add final position to history when drag ends
+    const finalX = Math.max(0, Math.round(elementPos.x));
+    const finalY = Math.max(0, Math.round(elementPos.y));
+    
+    dispatch({
+      type: 'UPDATE_SLIDE_ELEMENT',
+      payload: {
+        slideId: state.slides[state.currentSlideIndex]?.id,
+        elementId: element.id,
+        updates: { x: finalX, y: finalY },
+        autoSave: true,
+        addToHistory: true // Add to history when drag completes
+      }
+    });
   };
 
   useEffect(() => {
@@ -73,15 +112,28 @@ const ImageElement = ({ element, isSelected, canEdit, onSelect, zoom }) => {
   }, [element.x, element.y]);
 
   const handleResize = (newDimensions) => {
-    const updatedElement = {
-      ...element,
-      ...newDimensions
-    };
+    if (!canEdit) return;
 
+    // Update context state
+    dispatch({
+      type: 'UPDATE_SLIDE_ELEMENT',
+      payload: {
+        slideId: state.slides[state.currentSlideIndex]?.id,
+        elementId: element.id,
+        updates: newDimensions,
+        autoSave: true,
+        addToHistory: true
+      }
+    });
+
+    // Emit socket update
     if (socket) {
       socket.emit('element-updated', {
         elementId: element.id,
-        element: updatedElement,
+        element: {
+          ...element,
+          ...newDimensions
+        },
         slideId: state.slides[state.currentSlideIndex]?.id,
         presentationId: state.presentation?.id
       });

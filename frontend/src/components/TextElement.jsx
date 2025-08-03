@@ -9,7 +9,7 @@ const TextElement = ({ element, isSelected, canEdit, onSelect, zoom }) => {
   const [elementPos, setElementPos] = useState({ x: element.x, y: element.y });
   const textRef = useRef(null);
 
-  const { socket, state } = usePresentation();
+  const { socket, state, dispatch } = usePresentation();
 
   const handleDoubleClick = () => {
     if (canEdit) {
@@ -18,16 +18,40 @@ const TextElement = ({ element, isSelected, canEdit, onSelect, zoom }) => {
   };
 
   const handleTextChange = (e) => {
-    const newText = e.target.textContent;
-    const updatedElement = {
-      ...element,
-      content: { ...element.content, text: newText }
-    };
+    const newText = e.target.innerText || e.target.textContent || '';
+    
+    // Don't update context during typing to prevent cursor jumping
+    // Just store the current text locally
+    if (textRef.current) {
+      textRef.current.setAttribute('data-text', newText);
+    }
+  };
 
+  const handleTextFinish = () => {
+    const currentText = textRef.current?.textContent || textRef.current?.getAttribute('data-text') || '';
+    
+    // Update context state and add to history
+    dispatch({
+      type: 'UPDATE_SLIDE_ELEMENT',
+      payload: {
+        slideId: state.slides[state.currentSlideIndex]?.id,
+        elementId: element.id,
+        updates: { 
+          content: { ...element.content, text: currentText }
+        },
+        autoSave: true,
+        addToHistory: true // Add text changes to history
+      }
+    });
+    
+    // Emit socket update when finished editing
     if (socket) {
       socket.emit('element-updated', {
         elementId: element.id,
-        element: updatedElement,
+        element: {
+          ...element,
+          content: { ...element.content, text: currentText }
+        },
         slideId: state.slides[state.currentSlideIndex]?.id,
         presentationId: state.presentation?.id
       });
@@ -39,6 +63,7 @@ const TextElement = ({ element, isSelected, canEdit, onSelect, zoom }) => {
       e.preventDefault();
       setIsEditing(false);
       textRef.current?.blur();
+      handleTextFinish();
     }
   };
 
@@ -62,29 +87,68 @@ const TextElement = ({ element, isSelected, canEdit, onSelect, zoom }) => {
     const newY = (e.clientY - dragStart.y) / zoom;
 
     setElementPos({ x: newX, y: newY });
+    
+    // Update position immediately during drag (no history)
+    if (window.textDragTimeout) {
+      clearTimeout(window.textDragTimeout);
+    }
+    
+    window.textDragTimeout = setTimeout(() => {
+      const roundedX = Math.max(0, Math.round(newX));
+      const roundedY = Math.max(0, Math.round(newY));
+      
+      // Update context state without adding to history during drag
+      dispatch({
+        type: 'UPDATE_SLIDE_ELEMENT',
+        payload: {
+          slideId: state.slides[state.currentSlideIndex]?.id,
+          elementId: element.id,
+          updates: { x: roundedX, y: roundedY },
+          autoSave: false,
+          addToHistory: false // Don't add to history during drag
+        }
+      });
+
+      // Emit socket update
+      if (socket && state.slides[state.currentSlideIndex]?.id) {
+        socket.emit('element-updated', {
+          elementId: element.id,
+          element: {
+            ...element,
+            x: roundedX,
+            y: roundedY
+          },
+          slideId: state.slides[state.currentSlideIndex].id,
+          presentationId: state.presentation?.id
+        });
+      }
+    }, 100);
   };
 
   const handleMouseUp = () => {
     if (!isDragging) return;
 
     setIsDragging(false);
-
-    if (elementPos.x !== element.x || elementPos.y !== element.y) {
-      const updatedElement = {
-        ...element,
-        x: Math.max(0, elementPos.x),
-        y: Math.max(0, elementPos.y)
-      };
-
-      if (socket) {
-        socket.emit('element-updated', {
-          elementId: element.id,
-          element: updatedElement,
-          slideId: state.slides[state.currentSlideIndex]?.id,
-          presentationId: state.presentation?.id
-        });
-      }
+    
+    // Clear any pending drag timeout
+    if (window.textDragTimeout) {
+      clearTimeout(window.textDragTimeout);
     }
+    
+    // Add final position to history when drag ends
+    const finalX = Math.max(0, Math.round(elementPos.x));
+    const finalY = Math.max(0, Math.round(elementPos.y));
+    
+    dispatch({
+      type: 'UPDATE_SLIDE_ELEMENT',
+      payload: {
+        slideId: state.slides[state.currentSlideIndex]?.id,
+        elementId: element.id,
+        updates: { x: finalX, y: finalY },
+        autoSave: true,
+        addToHistory: true // Add to history when drag completes
+      }
+    });
   };
 
   useEffect(() => {
@@ -103,16 +167,40 @@ const TextElement = ({ element, isSelected, canEdit, onSelect, zoom }) => {
     setElementPos({ x: element.x, y: element.y });
   }, [element.x, element.y]);
 
-  const handleResize = (newDimensions) => {
-    const updatedElement = {
-      ...element,
-      ...newDimensions
-    };
+  useEffect(() => {
+    // Only update text content from socket updates when not editing
+    if (!isEditing && textRef.current) {
+      const elementText = element.content?.text || '';
+      const currentText = textRef.current.textContent || '';
+      
+      // Only update if text is different and it's from another user
+      if (elementText !== currentText && elementText.trim() !== '') {
+        textRef.current.textContent = elementText;
+      }
+    }
+  }, [element.content?.text, isEditing]);
 
+  const handleResize = (newDimensions) => {
+    if (!canEdit) return;
+
+    // Update context state
+    dispatch({
+      type: 'UPDATE_SLIDE_ELEMENT',
+      payload: {
+        slideId: state.slides[state.currentSlideIndex]?.id,
+        elementId: element.id,
+        updates: newDimensions
+      }
+    });
+
+    // Emit socket update
     if (socket) {
       socket.emit('element-updated', {
         elementId: element.id,
-        element: updatedElement,
+        element: {
+          ...element,
+          ...newDimensions
+        },
         slideId: state.slides[state.currentSlideIndex]?.id,
         presentationId: state.presentation?.id
       });
@@ -155,11 +243,14 @@ const TextElement = ({ element, isSelected, canEdit, onSelect, zoom }) => {
         contentEditable={isEditing}
         suppressContentEditableWarning={true}
         style={textStyle}
-        onBlur={() => setIsEditing(false)}
+        onBlur={() => {
+          setIsEditing(false);
+          handleTextFinish();
+        }}
         onInput={handleTextChange}
         onKeyDown={handleKeyDown}
       >
-        {element.content?.text || 'Double-click to edit'}
+        {element.content?.text || (!isEditing ? 'Double-click to edit' : '')}
       </div>
       <ResizeHandles
         element={element}

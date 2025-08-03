@@ -61,6 +61,19 @@ router.put('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
+    const { creatorNickname } = req.body;
+    
+    // Get presentation to verify creator
+    const presentation = await Presentation.getById(req.params.id);
+    if (!presentation) {
+      return res.status(404).json({ error: 'Presentation not found' });
+    }
+    
+    // Check if the requester is the creator
+    if (presentation.creator_nickname !== creatorNickname) {
+      return res.status(403).json({ error: 'Only the creator can delete this presentation' });
+    }
+    
     await Presentation.delete(req.params.id);
     res.json({ success: true });
   } catch (error) {

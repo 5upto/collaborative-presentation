@@ -40,18 +40,53 @@ module.exports = (io) => {
     });
 
     socket.on('element-updated', async (data) => {
-      const { elementId, element, presentationId } = data;
+      const { elementId, element, presentationId, slideId } = data;
       
       try {
-        await Element.update(elementId, element);
+        console.log('Processing element update:', { elementId, element, presentationId, slideId });
+        
+        // Broadcast immediately to all other users first for real-time feel
+        const broadcastData = {
+          elementId,
+          element: {
+            ...element,
+            x: Number(element.x),
+            y: Number(element.y),
+            width: Number(element.width),
+            height: Number(element.height),
+            zIndex: Number(element.zIndex || element.z_index || 1)
+          },
+          slideId: slideId
+        };
+        
+        socket.to(presentationId).emit('element-updated', broadcastData);
+        console.log(`Element ${elementId} broadcasted to presentation ${presentationId}`);
+        
+        // Then update database
+        const existingElement = await Element.getById(elementId);
+        if (!existingElement) {
+          console.error('Element not found:', elementId);
+          return;
+        }
+        
+        // Create element data for database update, preserving existing data
+        const elementData = {
+          type: element.type || existingElement.type,
+          x: element.x !== undefined ? Number(element.x) : Number(existingElement.x),
+          y: element.y !== undefined ? Number(element.y) : Number(existingElement.y),
+          width: element.width !== undefined ? Number(element.width) : Number(existingElement.width),
+          height: element.height !== undefined ? Number(element.height) : Number(existingElement.height),
+          content: element.content !== undefined ? element.content : existingElement.content,
+          styles: element.styles !== undefined ? element.styles : existingElement.styles,
+          zIndex: element.zIndex !== undefined ? Number(element.zIndex) : Number(existingElement.zIndex || existingElement.z_index || 1)
+        };
+        
+        await Element.update(elementId, elementData);
         await Presentation.updateLastActivity(presentationId);
         
-        socket.to(presentationId).emit('element-updated', {
-          elementId,
-          element,
-          slideId: data.slideId
-        });
+        console.log(`Element ${elementId} updated in database`);
       } catch (error) {
+        console.error('Socket element update error:', error);
         socket.emit('error', { message: 'Failed to update element' });
       }
     });

@@ -38,11 +38,11 @@ const PresentationList = () => {
         title: newPresentationTitle.trim(),
         creatorNickname: user.nickname
       });
-      
+
       setShowCreateModal(false);
       setNewPresentationTitle('');
       await fetchPresentations();
-      
+
       // Navigate to the new presentation
       window.location.href = `/presentation/${response.data.id}`;
     } catch (error) {
@@ -50,16 +50,29 @@ const PresentationList = () => {
     }
   };
 
-  const deletePresentation = async (id, e) => {
+  const deletePresentation = async (id, presentation, e) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
+    // Check if current user is the creator
+    if (presentation.creator_nickname !== user.nickname) {
+      alert('Only the creator can delete this presentation.');
+      return;
+    }
+
     if (window.confirm('Are you sure you want to delete this presentation?')) {
       try {
-        await api.delete(`/presentations/${id}`);
+        await api.delete(`/presentations/${id}`, {
+          data: { creatorNickname: user.nickname }
+        });
         await fetchPresentations();
       } catch (error) {
         console.error('Failed to delete presentation:', error);
+        if (error.response?.status === 403) {
+          alert('You do not have permission to delete this presentation.');
+        } else {
+          alert('Failed to delete presentation. Please try again.');
+        }
       }
     }
   };
@@ -87,7 +100,7 @@ const PresentationList = () => {
               <Presentation className="h-8 w-8 text-blue-600" />
               <h1 className="text-2xl font-bold text-gray-900">CollabSlides</h1>
             </div>
-            
+
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-600">Welcome, {user.nickname}</span>
               <button
@@ -113,7 +126,7 @@ const PresentationList = () => {
               placeholder="Search presentations..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
             />
           </div>
         </div>
@@ -150,32 +163,35 @@ const PresentationList = () => {
                   <div className="absolute inset-0 flex items-center justify-center">
                     <Presentation className="h-12 w-12 text-blue-600 opacity-50" />
                   </div>
-                  <div className="absolute top-2 right-2">
-                    <button
-                      onClick={(e) => deletePresentation(presentation.id, e)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 hover:bg-red-600 text-white p-1 rounded-full"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
+                  {presentation.creator_nickname === user.nickname && (
+                    <div className="absolute top-2 right-2">
+                      <button
+                        onClick={(e) => deletePresentation(presentation.id, presentation, e)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 hover:bg-red-600 text-white p-1 rounded-full"
+                        title="Delete presentation"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
-                
+
                 <div className="p-4">
                   <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
                     {presentation.title}
                   </h3>
-                  
+
                   <div className="space-y-2 text-sm text-gray-500">
                     <div className="flex items-center space-x-2">
                       <Users className="h-4 w-4" />
                       <span>{presentation.creator_nickname}</span>
                     </div>
-                    
+
                     <div className="flex items-center space-x-2">
                       <Calendar className="h-4 w-4" />
                       <span>{formatDate(presentation.updated_at)}</span>
                     </div>
-                    
+
                     <div className="flex justify-between items-center text-xs">
                       <span>{presentation.slide_count || 0} slides</span>
                       <span className="flex items-center space-x-1">
@@ -193,10 +209,10 @@ const PresentationList = () => {
 
       {/* Create Presentation Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-96">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Create New Presentation</h2>
-            
+
             <form onSubmit={createPresentation}>
               <div className="mb-4">
                 <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
@@ -207,13 +223,13 @@ const PresentationList = () => {
                   id="title"
                   value={newPresentationTitle}
                   onChange={(e) => setNewPresentationTitle(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                   placeholder="Enter presentation title"
                   autoFocus
                   required
                 />
               </div>
-              
+
               <div className="flex justify-end space-x-3">
                 <button
                   type="button"

@@ -143,11 +143,11 @@ const PresentMode = () => {
             key={element.id}
             className="absolute"
             style={{
-              left: `${(element.x / 1920) * 100}%`,
-              top: `${(element.y / 1080) * 100}%`,
-              width: `${(element.width / 1920) * 100}%`,
-              height: `${(element.height / 1080) * 100}%`,
-              fontSize: `${(styles.fontSize || 16) * 0.1}vw`,
+              left: `${element.x}px`,
+              top: `${element.y}px`,
+              width: `${element.width}px`,
+              height: `${element.height}px`,
+              fontSize: styles.fontSize || '16px',
               fontFamily: styles.fontFamily || 'Arial',
               color: styles.color || '#000000',
               textAlign: styles.textAlign || 'left',
@@ -170,10 +170,10 @@ const PresentMode = () => {
             key={element.id}
             className="absolute"
             style={{
-              left: `${(element.x / 1920) * 100}%`,
-              top: `${(element.y / 1080) * 100}%`,
-              width: `${(element.width / 1920) * 100}%`,
-              height: `${(element.height / 1080) * 100}%`,
+              left: `${element.x}px`,
+              top: `${element.y}px`,
+              width: `${element.width}px`,
+              height: `${element.height}px`,
               zIndex: element.z_index || 1
             }}
           >
@@ -189,10 +189,10 @@ const PresentMode = () => {
             key={element.id}
             className="absolute"
             style={{
-              left: `${(element.x / 1920) * 100}%`,
-              top: `${(element.y / 1080) * 100}%`,
-              width: `${(element.width / 1920) * 100}%`,
-              height: `${(element.height / 1080) * 100}%`,
+              left: `${element.x}px`,
+              top: `${element.y}px`,
+              width: `${element.width}px`,
+              height: `${element.height}px`,
               zIndex: element.z_index || 1
             }}
           >
@@ -273,13 +273,13 @@ const PresentMode = () => {
                   }`}
                   onClick={() => goToSlide(index)}
                 >
-                  <div className="aspect-video bg-white relative">
-                    <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="aspect-video bg-white relative overflow-hidden">
+                    <div className="absolute inset-0">
                       <div className="relative" style={{
-                        width: '100%',
-                        height: '100%',
-                        transform: 'scale(0.5)',
-                        transformOrigin: 'center'
+                        width: '800px',
+                        height: '450px',
+                        transform: 'scale(0.2)',
+                        transformOrigin: 'top left'
                       }}>
                         {slide.elements?.map(renderSlideElement)}
                       </div>
@@ -301,15 +301,15 @@ const PresentMode = () => {
           <div 
             className="relative"
             style={{
-              width: '1920px',
-              height: '1080px',
-              transform: 'scale(1.4)',
+              width: '800px',
+              height: '450px',
+              transform: 'scale(1.5)',
               transformOrigin: 'center',
               position: 'absolute',
-              top: '90%',
-              left: '90%',
-              marginLeft: '-800px',
-              marginTop: '-400px',
+              top: '50%',
+              left: '50%',
+              marginLeft: '-400px',
+              marginTop: '-225px',
               backgroundColor: 'white'
             }}
           >
