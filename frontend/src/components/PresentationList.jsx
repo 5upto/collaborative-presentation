@@ -4,6 +4,7 @@ import { Plus, Users, Presentation, Calendar, Search, Trash2 } from 'lucide-reac
 import { api } from '../utils/api';
 import { formatDate } from '../utils/helpers';
 import { usePresentation } from '../context/PresentationContext';
+import slideForge from '../assets/slideforge.png'
 
 const PresentationList = () => {
   const [presentations, setPresentations] = useState([]);
@@ -97,8 +98,8 @@ const PresentationList = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
-              <Presentation className="h-8 w-8 text-blue-600" />
-              <h1 className="text-2xl font-bold text-gray-900">CollabSlides</h1>
+              <img src={slideForge} className="h-12 w-12" alt="SlideForge Logo" />
+              <h1 className="text-2xl font-bold text-gray-900">Slideforge</h1>
             </div>
 
             <div className="flex items-center space-x-4">

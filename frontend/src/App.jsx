@@ -6,6 +6,7 @@ import PresentMode from './components/PresentMode';
 import { PresentationProvider } from './context/PresentationContext';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import slideForge from './assets/slideforge.png';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -70,7 +71,10 @@ const LoginScreen = ({ onLogin }) => {
     <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-800 flex items-center justify-center">
       <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full mx-4">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Slideforge</h1>
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <img src={slideForge} className="h-12 w-12" alt="slideForgeLogo" />
+            <h1 className="text-3xl font-bold text-gray-900">Slideforge</h1>
+          </div>
           <p className="text-gray-600">Professional Collaborative Presentations</p>
         </div>
 

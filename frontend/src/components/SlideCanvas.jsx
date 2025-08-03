@@ -140,6 +140,11 @@ const SlideCanvas = () => {
   const addElement = useCallback((type, options = {}) => {
     if (!canEdit || !currentSlide || !socket) return;
 
+    // Calculate next z-index to ensure new elements appear on top
+    const maxZIndex = currentSlide.elements?.length > 0 
+      ? Math.max(...currentSlide.elements.map(el => el.zIndex || 1))
+      : 0;
+
     const element = {
       id: `element_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       type,
@@ -147,7 +152,7 @@ const SlideCanvas = () => {
       y: contextMenu?.canvasY || 100,
       width: 200,
       height: 50,
-      zIndex: Math.floor(Math.random() * 1000) + 1,
+      zIndex: maxZIndex + 1,
       ...options
     };
 
@@ -184,8 +189,39 @@ const SlideCanvas = () => {
   const handleElementSelect = useCallback((elementId) => {
     if (canEdit) {
       dispatch({ type: 'SET_SELECTED_ELEMENTS', payload: [elementId] });
+      
+      // Bring selected element to front temporarily for better visibility
+      const element = currentSlide?.elements?.find(el => el.id === elementId);
+      if (element && currentSlide?.elements) {
+        const maxZIndex = Math.max(...currentSlide.elements.map(el => el.zIndex || 1));
+        if (element.zIndex < maxZIndex) {
+          dispatch({
+            type: 'UPDATE_SLIDE_ELEMENT',
+            payload: {
+              slideId: currentSlide.id,
+              elementId: elementId,
+              updates: { zIndex: maxZIndex + 1 },
+              autoSave: true,
+              addToHistory: false // Don't add selection to history
+            }
+          });
+          
+          // Emit socket update for z-index change
+          if (socket) {
+            socket.emit('element-updated', {
+              elementId: elementId,
+              element: {
+                ...element,
+                zIndex: maxZIndex + 1
+              },
+              slideId: currentSlide.id,
+              presentationId: state.presentation?.id
+            });
+          }
+        }
+      }
     }
-  }, [canEdit, dispatch]);
+  }, [canEdit, dispatch, currentSlide, socket, state.presentation]);
 
   const renderElement = (element) => {
     const isSelected = state.selectedElements.includes(element.id);
@@ -235,8 +271,11 @@ const SlideCanvas = () => {
           onMouseLeave={handleCanvasMouseUp}
           onContextMenu={handleContextMenu}
         >
-          {/* Slide Elements */}
-          {currentSlide?.elements?.map(renderElement)}
+          {/* Slide Elements - sorted by z-index for proper layering */}
+          {currentSlide?.elements
+            ?.slice()
+            .sort((a, b) => (a.zIndex || 1) - (b.zIndex || 1))
+            .map(renderElement)}
 
           {/* Selection Box */}
           {selectionBox && (
@@ -308,6 +347,73 @@ const SlideCanvas = () => {
           >
             Add Image
           </div>
+          
+          {/* Layer management options for selected elements */}
+          {state.selectedElements.length > 0 && (
+            <>
+              <div className="border-t border-gray-200 my-1" />
+              <div
+                className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                onClick={() => {
+                  const selectedElement = currentSlide?.elements?.find(el => el.id === state.selectedElements[0]);
+                  if (selectedElement && currentSlide?.elements) {
+                    const maxZIndex = Math.max(...currentSlide.elements.map(el => el.zIndex || 1));
+                    dispatch({
+                      type: 'UPDATE_SLIDE_ELEMENT',
+                      payload: {
+                        slideId: currentSlide.id,
+                        elementId: selectedElement.id,
+                        updates: { zIndex: maxZIndex + 1 },
+                        autoSave: true,
+                        addToHistory: true
+                      }
+                    });
+                    if (socket) {
+                      socket.emit('element-updated', {
+                        elementId: selectedElement.id,
+                        element: { ...selectedElement, zIndex: maxZIndex + 1 },
+                        slideId: currentSlide.id,
+                        presentationId: state.presentation?.id
+                      });
+                    }
+                  }
+                  setContextMenu(null);
+                }}
+              >
+                Bring to Front
+              </div>
+              <div
+                className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                onClick={() => {
+                  const selectedElement = currentSlide?.elements?.find(el => el.id === state.selectedElements[0]);
+                  if (selectedElement && currentSlide?.elements) {
+                    const minZIndex = Math.min(...currentSlide.elements.map(el => el.zIndex || 1));
+                    dispatch({
+                      type: 'UPDATE_SLIDE_ELEMENT',
+                      payload: {
+                        slideId: currentSlide.id,
+                        elementId: selectedElement.id,
+                        updates: { zIndex: Math.max(1, minZIndex - 1) },
+                        autoSave: true,
+                        addToHistory: true
+                      }
+                    });
+                    if (socket) {
+                      socket.emit('element-updated', {
+                        elementId: selectedElement.id,
+                        element: { ...selectedElement, zIndex: Math.max(1, minZIndex - 1) },
+                        slideId: currentSlide.id,
+                        presentationId: state.presentation?.id
+                      });
+                    }
+                  }
+                  setContextMenu(null);
+                }}
+              >
+                Send to Back
+              </div>
+            </>
+          )}
         </div>
       )}
 
