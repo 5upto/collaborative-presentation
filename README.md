@@ -1,12 +1,145 @@
-# React + Vite
+# Slideforge (Collaborative Presentation Software)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A real-time collaborative presentation tool that allows multiple users to create and edit presentations simultaneously. Built with React, Node.js, and Socket.IO for real-time collaboration.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- 🎨 Create and edit presentations with multiple slides
+- 👥 Real-time collaboration with multiple users
+- 🖌️ Rich text editing and formatting
+- 🖼️ Add images and shapes to slides
+- 🎭 Presentation mode for showcasing
+- 💾 Auto-save functionality
+- 🔄 Real-time cursor and selection tracking
 
-## Expanding the ESLint configuration
+## Tech Stack
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### Frontend
+- React 19
+- Vite
+- Material-UI (MUI) & lucid-react for UI components
+- Socket.IO Client for real-time updates
+- React-Router for navigation
+- TailwindCSS for styling
+
+### Backend
+- Node.js with Express
+- Socket.IO for real-time communication
+- MySQL database
+- Multer for file uploads
+- Sharp for image processing
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js (v16 or higher)
+- MySQL (v8.0 or higher)
+- npm or yarn
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/5upto/collaborative-presentation.git
+   cd collaborative-presentation
+   ```
+
+2. Set up the backend:
+   ```bash
+   cd backend
+   npm install
+   cp .env.example .env
+   # Update .env with your database credentials
+   ```
+
+3. Set up the frontend:
+   ```bash
+   cd ../frontend
+   npm install
+   cp .env.example .env
+   # Update .env with your backend URL
+   ```
+
+### Running the Application
+
+1. Start the backend server:
+   ```bash
+   cd backend
+   npm run dev
+   ```
+
+2. In a new terminal, start the frontend development server:
+   ```bash
+   cd frontend
+   npm run dev
+   ```
+
+3. Open your browser and navigate to `http://localhost:5173`
+
+## Project Structure
+
+```
+collaborative-presentation/
+├── backend/                    
+│   ├── config/                 
+│   ├── routes/                
+│   ├── socket/                
+│   ├── models/               
+│   └── server.js               
+├── frontend/                  
+│   ├── public/               
+│   ├── src/
+│   │   ├── assets/          
+│   │   ├── components/        
+│   │   ├── context/          
+│   │   ├── hooks/             
+│   │   ├── utils/            
+│   │   ├── App.jsx           
+│   │   └── main.jsx                   
+│   └── vite.config.js        
+└── README.md                  
+```
+
+## Environment Variables
+
+### Backend (.env)
+Create a `.env` file in the `backend` directory with the following variables:
+
+```env
+PORT=8080
+NODE_ENV=development
+DB_HOST=localhost
+DB_USER=your_db_user
+DB_PASSWORD=your_db_password
+DB_NAME=slideforge
+DB_CHARSET=utf8mb4
+```
+
+### Frontend (.env)
+Create a `.env` file in the `frontend` directory with the following variables:
+
+```env
+VITE_API_URL=http://localhost:8080
+MODE=development
+VITE_SOCKET_URL=ws://localhost:8080
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgements
+
+- [React](https://reactjs.org/)
+- [Socket.IO](https://socket.io/)
+- [Material-UI](https://mui.com/)
+- [Vite](https://vitejs.dev/)
