@@ -5,9 +5,9 @@ export const useSocket = () => {
   const [socket, setSocket] = useState(null);
 
   useEffect(() => {
-    const socketUrl = window.location.hostname === 'localhost' 
-      ? 'https://slideforge-82jm.onrender.com' 
-      : `${window.location.protocol}//${window.location.hostname}:8080`;
+    const socketUrl = window.location.hostname === 'https://slideforge-82jm.onrender.com';
+      // ? 'https://slideforge-82jm.onrender.com' 
+      // : `${window.location.protocol}//${window.location.hostname}:8080`;
 
     const newSocket = io(socketUrl, {
       transports: ['websocket', 'polling'],
