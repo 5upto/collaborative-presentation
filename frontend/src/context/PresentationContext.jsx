@@ -188,9 +188,7 @@ function presentationReducer(state, action) {
               zIndex: Number(element.zIndex || element.z_index) || 1
             }));
 
-            const API_BASE_URL = window.location.hostname === 'localhost' 
-              ? 'https://slideforge-82jm.onrender.com/api' 
-              : `${window.location.protocol}//${window.location.hostname}:8080/api`;
+            const API_BASE_URL = 'https://slideforge-82jm.onrender.com/api';
             
             fetch(`${API_BASE_URL}/slides/${slideToSave.id}`, {
               method: 'PUT',
