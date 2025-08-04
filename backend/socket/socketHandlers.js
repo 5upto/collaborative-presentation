@@ -124,6 +124,28 @@ module.exports = (io) => {
       socket.to(presentationId).emit('slide-changed', { slideIndex });
     });
 
+    socket.on('slide-added', async (data) => {
+      const { presentationId, slide } = data;
+      try {
+        await Presentation.updateLastActivity(presentationId);
+        socket.to(presentationId).emit('slide-added', { slide });
+      } catch (error) {
+        console.error('Error handling slide-added:', error);
+        socket.emit('error', { message: 'Failed to handle slide addition' });
+      }
+    });
+
+    socket.on('slide-deleted', async (data) => {
+      const { presentationId, slideId } = data;
+      try {
+        await Presentation.updateLastActivity(presentationId);
+        socket.to(presentationId).emit('slide-deleted', { slideId });
+      } catch (error) {
+        console.error('Error handling slide-deleted:', error);
+        socket.emit('error', { message: 'Failed to handle slide deletion' });
+      }
+    });
+
     socket.on('disconnect', async () => {
       try {
         const user = await User.getBySocketId(socket.id);

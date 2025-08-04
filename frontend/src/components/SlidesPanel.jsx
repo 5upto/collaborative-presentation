@@ -23,7 +23,10 @@ const SlidesPanel = () => {
   };
 
   const handleAddSlide = async () => {
-    if (!canEdit || !state.presentation?.id) return;
+    if (!isCreator || !state.presentation?.id) {
+      toast.error('You do not have permission to add slides');
+      return;
+    }
 
     try {
       const response = await api.post('/slides', {
@@ -166,8 +169,10 @@ const SlidesPanel = () => {
           slides: newSlides
         });
       }
+      toast.success('Slides reordered successfully');
     } catch (error) {
       console.error('Failed to reorder slides:', error);
+      toast.error('Failed to reorder slides');
     }
   };
 

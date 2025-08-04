@@ -101,21 +101,43 @@ function presentationReducer(state, action) {
     case 'SET_USER_ROLE':
       return { ...state, userRole: action.payload };
     
-    case 'ADD_SLIDE':
+    case 'ADD_SLIDE': {
+      // Skip if this is a socket event and we already have this slide
+      if (action.fromSocket && state.slides.some(slide => slide.id === action.payload.id)) {
+        return state;
+      }
+      
       const addSlideState = { 
         ...state, 
         slides: [...state.slides, action.payload]
       };
+      
+      // Only add to history if this is a user action, not a socket update
+      if (action.fromSocket) {
+        return addSlideState;
+      }
       return addToHistory(addSlideState, 'slide_added', action);
+    }
     
-    case 'DELETE_SLIDE':
+    case 'DELETE_SLIDE': {
+      // Skip if this is a socket event and the slide doesn't exist
+      if (action.fromSocket && !state.slides.some(slide => slide.id === action.payload)) {
+        return state;
+      }
+      
       const newSlides = state.slides.filter(slide => slide.id !== action.payload);
       const deleteSlideState = { 
         ...state, 
         slides: newSlides,
         currentSlideIndex: Math.min(state.currentSlideIndex, newSlides.length - 1)
       };
+      
+      // Only add to history if this is a user action, not a socket update
+      if (action.fromSocket) {
+        return deleteSlideState;
+      }
       return addToHistory(deleteSlideState, 'slide_deleted', action);
+    }
     
     case 'UPDATE_SLIDE_ELEMENT':
       const updatedSlides = state.slides.map(slide => 
@@ -345,12 +367,30 @@ export const PresentationProvider = ({ children, user }) => {
         dispatch({ type: 'SET_CURRENT_SLIDE', payload: data.slideIndex, fromSocket: true });
       });
 
+      socket.on('slide-added', (data) => {
+        dispatch({ 
+          type: 'ADD_SLIDE', 
+          payload: data.slide,
+          fromSocket: true 
+        });
+      });
+
+      socket.on('slide-deleted', (data) => {
+        dispatch({ 
+          type: 'DELETE_SLIDE', 
+          payload: data.slideId,
+          fromSocket: true 
+        });
+      });
+
       return () => {
         socket.off('users-updated');
         socket.off('element-created');
         socket.off('element-updated');
         socket.off('element-deleted');
         socket.off('slide-changed');
+        socket.off('slide-added');
+        socket.off('slide-deleted');
       };
     }
   }, [socket, user.nickname]);
