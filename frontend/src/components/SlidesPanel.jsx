@@ -177,7 +177,7 @@ const SlidesPanel = () => {
   };
 
   return (
-    <div className={`${isMinimized ? 'w-12' : 'w-64'} bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out flex-shrink-0`}>
+    <div className={`${isMinimized ? 'w-12' : 'w-64'} bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out flex-shrink-0 h-full`}>
       <div className={`${isMinimized ? 'p-1 flex items-center justify-center' : 'p-4'} border-b border-gray-200`}>
         <div className={`flex items-center ${isMinimized ? 'justify-center w-full' : 'justify-between'}`}>
           <div className={`flex items-center ${isMinimized ? 'justify-center' : 'space-x-2'}`}>
@@ -203,7 +203,7 @@ const SlidesPanel = () => {
       </div>
 
       {!isMinimized && (
-        <div className="flex-1 overflow-y-auto p-2 pb-4 space-y-2" style={{ maxHeight: 'calc(100vh - 160px)' }}>
+        <div className="flex-1 overflow-y-auto p-2 pb-4 space-y-2 h-full">
           {state.slides.map((slide, index) => (
             <div
               key={slide.id}
