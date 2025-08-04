@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { Crown, Edit, Eye, MoreVertical, UserCheck } from 'lucide-react';
+import { Crown, Edit, Eye, MoreVertical, UserCheck, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import { usePresentation } from '../context/PresentationContext';
 
 const UsersList = () => {
   const { state, dispatch, socket, user } = usePresentation();
   const [expandedUser, setExpandedUser] = useState(null);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [showRoleInfo, setShowRoleInfo] = useState(false);
   
   const isCreator = state.userRole === 'creator';
 
@@ -49,15 +51,27 @@ const UsersList = () => {
   };
 
   return (
-    <div className="w-64 bg-white border-l border-gray-200 flex flex-col">
-      <div className="p-4 border-b border-gray-200">
-        <h3 className="font-semibold text-gray-900 flex items-center">
-          <UserCheck className="h-5 w-5 mr-2" />
-          Collaborators ({state.users.length})
-        </h3>
+    <div className={`${isMinimized ? 'w-12' : 'w-64'} h-full bg-white border-l border-gray-200 flex flex-col transition-all duration-300 ease-in-out flex-shrink-0`}>
+      <div className={`${isMinimized ? 'p-1 flex items-center justify-center' : 'p-4'} border-b border-gray-200`}>
+        <div className={`flex items-center ${isMinimized ? 'justify-center w-full' : 'justify-between'}`}>
+          {!isMinimized && (
+            <h3 className="font-semibold text-gray-900 flex items-center">
+              <UserCheck className="h-5 w-5 mr-2" />
+              Collaborators ({state.users.length})
+            </h3>
+          )}
+          <div
+            onClick={() => setIsMinimized(!isMinimized)}
+            className="cursor-pointer text-gray-500 hover:text-gray-700"
+            title={isMinimized ? 'Expand collaborators panel' : 'Minimize collaborators panel'}
+          >
+            {isMinimized ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+          </div>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      {!isMinimized && (
+        <div className="flex-1 overflow-y-auto">
         {state.users.length === 0 ? (
           <div className="p-4 text-center text-gray-500 text-sm">
             No active users
@@ -156,28 +170,44 @@ const UsersList = () => {
             ))}
           </div>
         )}
-      </div>
+        </div>
+      )}
 
-      {/* Role legend */}
-      <div className="p-4 border-t border-gray-200 bg-gray-50">
-        <div className="text-xs text-gray-600 space-y-2">
-          <div className="font-medium">Roles:</div>
-          <div className="space-y-1">
-            <div className="flex items-center space-x-2">
-              <Crown className="h-3 w-3 text-yellow-500" />
-              <span>Creator - Full access</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Edit className="h-3 w-3 text-blue-500" />
-              <span>Editor - Can edit slides</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Eye className="h-3 w-3 text-gray-500" />
-              <span>Viewer - Read only</span>
+      {/* Role info button - positioned at the very bottom */}
+      <div className="absolute bottom-2 right-2 w-5 h-5 rounded-full bg-gray-400 hover:bg-gray-500 flex items-center justify-center cursor-pointer transition-colors z-30"
+        onClick={() => setShowRoleInfo(!showRoleInfo)}
+        title="View role descriptions"
+      >
+        <span className="text-white text-xs font-medium">i</span>
+      </div>
+      
+      {showRoleInfo && (
+        <>
+          <div 
+            className="fixed inset-0 z-10" 
+            onClick={() => setShowRoleInfo(false)}
+          />
+          <div className="absolute bottom-8 right-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-40 p-3">
+            <div className="text-xs text-gray-600 space-y-2">
+              <div className="font-medium text-gray-800 mb-2">Roles:</div>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Crown className="h-3 w-3 text-yellow-500" />
+                  <span>Creator - Full access</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Edit className="h-3 w-3 text-blue-500" />
+                  <span>Editor - Can edit slides</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Eye className="h-3 w-3 text-gray-500" />
+                  <span>Viewer - Read only</span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 };

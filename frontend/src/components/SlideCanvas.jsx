@@ -11,6 +11,9 @@ const SlideCanvas = () => {
   const [dragStartPos, setDragStartPos] = useState(null);
   const [selectionBox, setSelectionBox] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
+  const [canvasPan, setCanvasPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
   const SLIDE_WIDTH = 800;
   const SLIDE_HEIGHT = 450;
@@ -45,6 +48,12 @@ const SlideCanvas = () => {
         });
         dispatch({ type: 'SET_SELECTED_ELEMENTS', payload: [] });
       }
+
+      // Stop panning on Escape key
+      if (e.key === 'Escape' && isPanning) {
+        setIsPanning(false);
+        setPanStart({ x: 0, y: 0 });
+      }
     };
 
     document.addEventListener('click', handleClickOutside);
@@ -54,7 +63,41 @@ const SlideCanvas = () => {
       document.removeEventListener('click', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [canEdit, state.selectedElements, socket, state.presentation, currentSlide, dispatch]);
+  }, [canEdit, state.selectedElements, socket, state.presentation, currentSlide, dispatch, isPanning]);
+
+  // Global mouse event listeners for smooth panning
+  useEffect(() => {
+    if (!isPanning) return;
+
+    const handleGlobalMouseMove = (e) => {
+      e.preventDefault();
+      setCanvasPan({
+        x: e.clientX - panStart.x,
+        y: e.clientY - panStart.y
+      });
+    };
+
+    const handleGlobalMouseUp = (e) => {
+      e.preventDefault();
+      setIsPanning(false);
+      setPanStart({ x: 0, y: 0 });
+    };
+
+    // Add global listeners for smooth panning
+    document.addEventListener('mousemove', handleGlobalMouseMove, { passive: false });
+    document.addEventListener('mouseup', handleGlobalMouseUp, { passive: false });
+    
+    // Prevent text selection during panning
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'grabbing';
+
+    return () => {
+      document.removeEventListener('mousemove', handleGlobalMouseMove);
+      document.removeEventListener('mouseup', handleGlobalMouseUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+  }, [isPanning, panStart]);
 
   const handleCanvasMouseDown = useCallback((e) => {
     if (e.target !== canvasRef.current) return;
@@ -76,28 +119,59 @@ const SlideCanvas = () => {
       return;
     }
 
-    // Default selection behavior
-    setDragStartPos({ x, y });
-    setSelectionBox({ startX: x, startY: y, endX: x, endY: y });
-    dispatch({ type: 'SET_SELECTED_ELEMENTS', payload: [] });
-  }, [canEdit, safeZoom, dispatch, selectedTool]);
+    // Handle canvas panning with Ctrl+Drag or middle mouse button
+    if (e.ctrlKey || e.button === 1) {
+      e.preventDefault();
+      setIsPanning(true);
+      setPanStart({
+        x: e.clientX - canvasPan.x,
+        y: e.clientY - canvasPan.y
+      });
+      return;
+    }
+
+    // Only start selection if left mouse button and no modifier keys
+    if (e.button === 0) {
+      setDragStartPos({ x, y });
+      setSelectionBox({ startX: x, startY: y, endX: x, endY: y });
+      dispatch({ type: 'SET_SELECTED_ELEMENTS', payload: [] });
+    }
+  }, [canEdit, safeZoom, dispatch, selectedTool, canvasPan]);
 
   const handleCanvasMouseMove = useCallback((e) => {
-    if (!dragStartPos || !canEdit) return;
+    if (!canEdit) return;
+
+    // Panning is now handled by global mouse move listener
+    // This local handler only deals with selection box
+    if (isPanning) {
+      return;
+    }
+
+    // Handle selection box
+    if (!dragStartPos) return;
 
     const rect = canvasRef.current.getBoundingClientRect();
     const x = (e.clientX - rect.left) / safeZoom;
     const y = (e.clientY - rect.top) / safeZoom;
 
-    setSelectionBox(prev => ({
+    setSelectionBox(prev => prev ? {
       ...prev,
       endX: x,
       endY: y
-    }));
-  }, [dragStartPos, canEdit, safeZoom]);
+    } : null);
+  }, [dragStartPos, canEdit, safeZoom, isPanning]);
 
-  const handleCanvasMouseUp = useCallback(() => {
+  const handleCanvasMouseUp = useCallback((e) => {
+    // Panning end is now handled by global mouse up listener
+    // This local handler only deals with selection
+    if (isPanning) {
+      return;
+    }
+
     if (!dragStartPos || !selectionBox) return;
+
+    // Only process selection for left mouse button
+    if (e.button !== 0) return;
 
     // Find elements within selection box
     const minX = Math.min(selectionBox.startX, selectionBox.endX);
@@ -121,7 +195,7 @@ const SlideCanvas = () => {
 
     setDragStartPos(null);
     setSelectionBox(null);
-  }, [dragStartPos, selectionBox, currentSlide, dispatch]);
+  }, [dragStartPos, selectionBox, currentSlide, dispatch, isPanning]);
 
   const handleContextMenu = useCallback((e) => {
     if (!canEdit) return;
@@ -247,12 +321,18 @@ const SlideCanvas = () => {
   };
 
   return (
-    <div className="flex-1 overflow-auto bg-gray-100 p-8">
+    <div 
+      className="flex-1 overflow-auto bg-gray-100 p-8"
+      style={{ cursor: isPanning ? 'grabbing' : 'default' }}
+    >
       <div
         className="slide-canvas mx-auto relative"
         style={{
-          width: SLIDE_WIDTH * safeZoom,
-          height: SLIDE_HEIGHT * safeZoom,
+          width: SLIDE_WIDTH,
+          height: SLIDE_HEIGHT,
+          transform: `translate(${canvasPan.x}px, ${canvasPan.y}px) scale(${safeZoom})`,
+          transformOrigin: 'center center',
+          transition: isPanning ? 'none' : 'transform 0.2s ease-out'
         }}
       >
         <div
@@ -262,8 +342,7 @@ const SlideCanvas = () => {
           style={{ 
             width: SLIDE_WIDTH, 
             height: SLIDE_HEIGHT,
-            transform: `scale(${safeZoom})`,
-            transformOrigin: 'top left'
+            cursor: isPanning ? 'grabbing' : (canEdit ? 'crosshair' : 'default')
           }}
           onMouseDown={handleCanvasMouseDown}
           onMouseMove={handleCanvasMouseMove}
@@ -296,34 +375,34 @@ const SlideCanvas = () => {
       {/* Context Menu */}
       {contextMenu && (
         <div
-          className="fixed bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50"
+          className="fixed bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50 text-gray-900"
           style={{
             left: contextMenu.x,
             top: contextMenu.y
           }}
         >
           <div
-            className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+            className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm text-gray-900"
             onClick={() => addElement('text')}
           >
             Add Text
           </div>
           <div className="border-t border-gray-200 my-1" />
           <div
-            className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+            className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm text-gray-900"
             onClick={() => addElement('shape', { content: { shape: 'rectangle' } })}
           >
             Add Rectangle
           </div>
           <div
-            className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+            className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm text-gray-900"
             onClick={() => addElement('shape', { content: { shape: 'circle' } })}
           >
             Add Circle
           </div>
           <div className="border-t border-gray-200 my-1" />
           <div
-            className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+            className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm text-gray-900"
             onClick={() => {
               const input = document.createElement('input');
               input.type = 'file';
@@ -353,7 +432,7 @@ const SlideCanvas = () => {
             <>
               <div className="border-t border-gray-200 my-1" />
               <div
-                className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm text-gray-900"
                 onClick={() => {
                   const selectedElement = currentSlide?.elements?.find(el => el.id === state.selectedElements[0]);
                   if (selectedElement && currentSlide?.elements) {
@@ -383,7 +462,7 @@ const SlideCanvas = () => {
                 Bring to Front
               </div>
               <div
-                className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm text-gray-900"
                 onClick={() => {
                   const selectedElement = currentSlide?.elements?.find(el => el.id === state.selectedElements[0]);
                   if (selectedElement && currentSlide?.elements) {

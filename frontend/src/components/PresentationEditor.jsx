@@ -216,15 +216,19 @@ const PresentationEditor = () => {
       {/* Main Editor */}
       <div className="flex-1 flex overflow-hidden">
         {/* Slides Panel */}
-        <SlidesPanel />
+        <div className="flex-shrink-0">
+          <SlidesPanel />
+        </div>
 
         {/* Canvas Area */}
-        <div className="flex-1 flex flex-col bg-gray-100">
+        <div className="flex-1 flex flex-col bg-gray-100 min-w-0">
           <SlideCanvas />
         </div>
 
         {/* Users Panel */}
-        <UsersList />
+        <div className="flex-shrink-0">
+          <UsersList />
+        </div>
       </div>
     </div>
   );

@@ -12,6 +12,8 @@ const PresentationList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newPresentationTitle, setNewPresentationTitle] = useState('');
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [presentationToDelete, setPresentationToDelete] = useState(null);
   const { user } = usePresentation();
 
   useEffect(() => {
@@ -51,7 +53,7 @@ const PresentationList = () => {
     }
   };
 
-  const deletePresentation = async (id, presentation, e) => {
+  const handleDeleteClick = (e, id, presentation) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -61,20 +63,28 @@ const PresentationList = () => {
       return;
     }
 
-    if (window.confirm('Are you sure you want to delete this presentation?')) {
-      try {
-        await api.delete(`/presentations/${id}`, {
-          data: { creatorNickname: user.nickname }
-        });
-        await fetchPresentations();
-      } catch (error) {
-        console.error('Failed to delete presentation:', error);
-        if (error.response?.status === 403) {
-          alert('You do not have permission to delete this presentation.');
-        } else {
-          alert('Failed to delete presentation. Please try again.');
-        }
+    setPresentationToDelete({ id, presentation });
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!presentationToDelete) return;
+    
+    try {
+      await api.delete(`/presentations/${presentationToDelete.id}`, {
+        data: { creatorNickname: user.nickname }
+      });
+      await fetchPresentations();
+    } catch (error) {
+      console.error('Failed to delete presentation:', error);
+      if (error.response?.status === 403) {
+        alert('You do not have permission to delete this presentation.');
+      } else {
+        alert('Failed to delete presentation. Please try again.');
       }
+    } finally {
+      setDeleteModalOpen(false);
+      setPresentationToDelete(null);
     }
   };
 
@@ -167,7 +177,7 @@ const PresentationList = () => {
                   {presentation.creator_nickname === user.nickname && (
                     <div className="absolute top-2 right-2">
                       <button
-                        onClick={(e) => deletePresentation(presentation.id, presentation, e)}
+                        onClick={(e) => handleDeleteClick(e, presentation.id, presentation)}
                         className="opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 hover:bg-red-600 text-white p-1 rounded-full"
                         title="Delete presentation"
                       >
@@ -250,6 +260,36 @@ const PresentationList = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Confirm Delete</h3>
+              </div>
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to delete this presentation? This action cannot be undone.
+              </p>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setDeleteModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
