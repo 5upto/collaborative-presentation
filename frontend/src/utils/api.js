@@ -8,13 +8,19 @@ const createApiInstance = (config = {}) => {
   const instance = axios.create({
     baseURL: API_BASE_URL,
     timeout: 30000, // 30 seconds timeout
+    withCredentials: true, // Important for CORS with credentials
     headers: {
       'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache',
+      'Accept': 'application/json',
+    },
+    ...config,
+    // Override headers if provided in config
+    headers: {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Pragma': 'no-cache',
       'Expires': '0',
-    },
-    ...config
+      ...config.headers
+    }
   });
 
   // Request interceptor
@@ -62,11 +68,9 @@ const createApiInstance = (config = {}) => {
         }
       }
 
-      // Handle specific error statuses
       if (error.response) {
         switch (error.response.status) {
           case 401:
-            // Handle unauthorized
             toast.error('Session expired. Please log in again.');
             break;
           case 404:
@@ -84,11 +88,9 @@ const createApiInstance = (config = {}) => {
             console.error('API Error:', error.response.data);
         }
       } else if (error.request) {
-        // The request was made but no response was received
         console.error('No response received:', error.request);
         toast.error('No response from server. Please check your connection.');
       } else {
-        // Something happened in setting up the request
         console.error('Request setup error:', error.message);
         toast.error('An error occurred while setting up the request.');
       }

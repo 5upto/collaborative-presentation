@@ -27,12 +27,28 @@ const io = socketIo(server, {
 });
 
 // Configure CORS
-app.use(cors({ 
+const corsOptions = {
   origin: 'https://slideforge-pro.vercel.app',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}));
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma', 'Expires'],
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+};
+
+// Enable CORS pre-flight
+app.options('*', cors(corsOptions));
+app.use(cors(corsOptions));
+
+// Handle preflight requests
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, Pragma, Expires');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    return res.status(200).json({});
+  }
+  next();
+});
 
 // Request logging
 app.use(morgan('dev'));
