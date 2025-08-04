@@ -10,7 +10,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: ["http://localhost:5173", "http://localhost:5000", "https://*.replit.dev", "https://*.replit.app"],
+    origin: ["http://localhost:5173", "http://localhost:5000", "https://*.replit.dev", "https://*.replit.app", "https://slideforge-pro.vercel.app"],
     methods: ["GET", "POST"],
     credentials: true
   }
