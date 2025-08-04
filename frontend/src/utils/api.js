@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API_BASE_URL = window.location.hostname === 'localhost' 
-  ? 'http://localhost:8080/api' 
+  ? 'https://slideforge-82jm.onrender.com/api' 
   : `${window.location.protocol}//${window.location.hostname}:8080/api`;
 
 export const api = axios.create({
