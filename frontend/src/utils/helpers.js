@@ -59,7 +59,10 @@ export const exportToPDF = async (slides, presentationTitle = 'Presentation') =>
           el.innerText = element.content?.text || '';
         } else if (element.type === 'shape') {
           el.style.background = element.styles?.fill || '#3b82f6';
-          el.style.border = `2px solid ${element.styles?.stroke || '#2563eb'}`;
+          // Only add border if stroke is explicitly defined
+          if (element.styles?.stroke) {
+            el.style.border = `${element.styles?.strokeWidth || 2}px solid ${element.styles.stroke}`;
+          }
           el.style.borderRadius = element.content?.shape === 'circle' ? '50%' : '0';
         } else if (element.type === 'image' && element.content?.src) {
           const img = document.createElement('img');

@@ -216,10 +216,14 @@ const PresentMode = () => {
 
   const renderSVGShape = (shapeType, styles) => {
     const commonProps = {
-      fill: styles.fill || '#3B82F6',
-      stroke: styles.stroke || '#1E40AF',
-      strokeWidth: styles.strokeWidth || 2
+      fill: styles.fill || '#3B82F6'
     };
+    
+    // Only add stroke if explicitly defined
+    if (styles.stroke) {
+      commonProps.stroke = styles.stroke;
+      commonProps.strokeWidth = styles.strokeWidth || 2;
+    }
 
     // For circle, we need to ensure it's rendered as a perfect circle
     switch (shapeType) {

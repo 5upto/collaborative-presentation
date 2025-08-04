@@ -163,7 +163,7 @@ const SlideCanvas = () => {
       // Use the shape type from options.content.shape if provided, otherwise default to rectangle
       let shapeType = options.content && options.content.shape ? options.content.shape : 'rectangle';
       element.content = { shape: shapeType };
-      element.styles = { fill: '#3b82f6', stroke: '#2563eb', strokeWidth: 2 };
+      element.styles = { fill: '#3b82f6' }; // Remove default stroke to avoid unwanted borders
       if (shapeType === 'circle') {
         element.width = 100;
         element.height = 100;
