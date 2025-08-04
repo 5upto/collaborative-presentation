@@ -189,7 +189,7 @@ function presentationReducer(state, action) {
             }));
 
             const API_BASE_URL = window.location.hostname === 'localhost' 
-              ? 'http://localhost:5000/api' 
+              ? 'https://slideforge-82jm.onrender.com/api' 
               : `${window.location.protocol}//${window.location.hostname}:8080/api`;
             
             fetch(`${API_BASE_URL}/slides/${slideToSave.id}`, {

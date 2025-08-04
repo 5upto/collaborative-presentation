@@ -6,7 +6,7 @@ export const useSocket = () => {
 
   useEffect(() => {
     const socketUrl = window.location.hostname === 'localhost' 
-      ? 'http://localhost:8080' 
+      ? 'https://slideforge-82jm.onrender.com' 
       : `${window.location.protocol}//${window.location.hostname}:8080`;
 
     const newSocket = io(socketUrl, {
